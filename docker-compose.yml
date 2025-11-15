@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  # Servidor Daytime
+  servidor-daytime:
+    build: .
+    container_name: servidor-daytime
+    ports:
+      - "13:13"
+    command: ["java", "socket.conconexion.servidor.ServidorDaytime2", "13"]
+    restart: unless-stopped
+    networks:
+      - red-sockets
+
+  # Servidor Echo Secuencial
+  servidor-echo-secuencial:
+    build: .
+    container_name: servidor-echo-secuencial
+    ports:
+      - "7000:7000"
+    command: ["java", "socket.conconexion.servidor.ServidorEcho2", "7000"]
+    restart: unless-stopped
+    networks:
+      - red-sockets
+
+  # Servidor Echo Concurrente (por defecto)
+  servidor-echo-concurrente:
+    build: .
+    container_name: servidor-echo-concurrente
+    ports:
+      - "7:7"
+    command: ["java", "socket.conconexion.servidor.ServidorEcho3", "7"]
+    restart: unless-stopped
+    networks:
+      - red-sockets
+
+  # Servidor de Subasta
+  servidor-subasta:
+    build: .
+    container_name: servidor-subasta
+    ports:
+      - "8080:8080"
+    command: ["java", "socket.conconexion.servidor.ServidorSubasta", "8080"]
+    restart: "no"  # No reiniciar automáticamente (la subasta dura 30 segundos)
+    networks:
+      - red-sockets
+
+  # Cliente Echo (opcional, para pruebas)
+  # Descomentar para ejecutar cliente en contenedor
+  # cliente-echo:
+  #   build: .
+  #   container_name: cliente-echo
+  #   stdin_open: true
+  #   tty: true
+  #   command: ["java", "socket.conconexion.cliente.ClienteEcho2"]
+  #   depends_on:
+  #     - servidor-echo-concurrente
+  #   networks:
+  #     - red-sockets
+
+networks:
+  red-sockets:
+    driver: bridge

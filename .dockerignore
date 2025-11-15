@@ -1,0 +1,29 @@
+# Archivos compilados (se compilan en el contenedor)
+*.class
+
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Documentación
+CLAUDE.md
+README.md
+*.md
+
+# IDE
+.vscode
+.idea
+*.iml
+.eclipse
+.classpath
+.project
+.settings
+
+# OS
+.DS_Store
+Thumbs.db
