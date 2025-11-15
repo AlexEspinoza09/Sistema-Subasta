@@ -2,7 +2,7 @@
 
 Proyecto de sistemas distribuidos que implementa múltiples protocolos de comunicación cliente-servidor utilizando sockets TCP en Java. Incluye arquitecturas secuenciales, concurrentes y un sistema de subasta en tiempo real.
 
-## 📋 Descripción General
+##  Descripción General
 
 Este proyecto demuestra diferentes patrones de comunicación en sistemas distribuidos:
 
@@ -10,7 +10,7 @@ Este proyecto demuestra diferentes patrones de comunicación en sistemas distrib
 - **Servidor Echo**: Repite los mensajes enviados por el cliente (versiones secuencial y concurrente)
 - **Sistema de Subasta**: Sistema de subasta en tiempo real con múltiples oferentes
 
-## 🏗️ Arquitectura
+##  Arquitectura
 
 ### Estructura de Paquetes
 
@@ -66,24 +66,29 @@ Ejemplos:
 - `ClienteEcho2` + `ClienteEchoAuxiliar2`
 - `ClienteSubasta` + `ClienteSubastaAuxiliar`
 
-## 🎯 Sistema de Subasta (Funcionalidad Avanzada)
+##  Sistema de Subasta (Funcionalidad Avanzada)
 
 ### Características
 
 - **Ofertas múltiples**: Cada cliente puede hacer múltiples ofertas durante la subasta
 - **Intervalo de ofertas**: 10 segundos entre cada propuesta
 - **Tiempo total**: 2 minutos (120 segundos)
+- **Broadcast automático**: El servidor envía la oferta ganadora cada 5 segundos a todos los clientes
 - **Feedback en tiempo real**:
   - Propuesta más alta actual
   - IP del líder
   - Tiempo restante
   - Estado personal (GANANDO/PERDIENDO)
+  - Actualizaciones automáticas cada 5 segundos
 
 ### Flujo del Sistema
 
 1. Cliente conecta y envía propuesta inicial
 2. Servidor responde con estado actual
-3. Cliente puede ofertar cada 10 segundos
+3. **Durante la subasta**:
+   - Cliente puede ofertar cada 10 segundos
+   - Servidor envía broadcast cada 5 segundos con la oferta ganadora actual
+   - Todos los clientes reciben actualizaciones automáticas
 4. Al finalizar los 2 minutos:
    - Servidor determina ganador (propuesta más alta)
    - Notifica a TODOS los clientes simultáneamente
@@ -95,7 +100,7 @@ Ejemplos:
 - `synchronized` para propuesta más alta
 - `CountDownLatch` para sincronizar broadcast final
 
-## 🚀 Compilación y Ejecución
+##  Compilación y Ejecución
 
 ### Requisitos
 
@@ -144,7 +149,7 @@ java socket.conconexion.cliente.ClienteEcho2
 java socket.conconexion.cliente.ClienteSubasta
 ```
 
-## 🐳 Despliegue con Docker
+##  Despliegue con Docker 🐳
 
 ### Construcción de Imágenes
 
@@ -194,7 +199,7 @@ telnet localhost 7
 nc localhost 7
 ```
 
-## 📝 Ejemplos de Uso
+##  Ejemplos de Uso
 
 ### Ejemplo 1: Sistema de Subasta con Múltiples Clientes
 
@@ -244,7 +249,7 @@ java socket.conconexion.cliente.ClienteEcho2
 # Ambos clientes funcionan al mismo tiempo
 ```
 
-## 🌐 Despliegue en AWS
+##  Despliegue en AWS
 
 ### Opción 1: Amazon ECS
 
@@ -265,7 +270,7 @@ docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/servidor-sockets:latest
 3. Ejecutar `docker-compose up -d`
 4. Configurar Security Group para permitir tráfico TCP en puertos necesarios
 
-## 📂 Estructura del Proyecto
+##  Estructura del Proyecto
 
 ```
 .
@@ -286,11 +291,10 @@ docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/servidor-sockets:latest
 │   └── ClienteSubastaAuxiliar.java
 ├── Dockerfile
 ├── docker-compose.yml
-├── CLAUDE.md                        # Guía para Claude Code
 └── README.md
 ```
 
-## 🔧 Configuración
+##  Configuración
 
 ### Tiempos Configurables
 
@@ -304,6 +308,11 @@ En `ClienteSubasta.java`:
 private static final int INTERVALO_PROPUESTA = 10; // 10 segundos
 ```
 
+**Intervalo de broadcast del servidor** (en `ServidorSubasta.java`, método `iniciarBroadcastPeriodico`):
+```java
+broadcastTimer.scheduleAtFixedRate(..., 5000, 5000); // 5 segundos
+```
+
 ### Puertos por Defecto
 
 Modificables en cada archivo de servidor:
@@ -312,7 +321,7 @@ Modificables en cada archivo de servidor:
 - Echo Concurrente: 7
 - Subasta: 8080
 
-## 📖 Protocolos Implementados
+##  Protocolos Implementados
 
 ### Protocolo Daytime
 - Petición implícita (solo conexión)
@@ -329,27 +338,30 @@ Modificables en cada archivo de servidor:
 Cliente -> Servidor: <monto_propuesta>
 Servidor -> Cliente: PROPUESTA_ALTA:<ip>:<monto>:TIEMPO:<seg>:TU_PROPUESTA:<GANANDO|PERDIENDO>
 
+[Cada 5 segundos - Broadcast automático]
+Servidor -> Todos: UPDATE:PROPUESTA_ALTA:<ip>:<monto>:TIEMPO:<segundos_restantes>
+
 [Al finalizar la subasta]
 Servidor -> Todos: GANADOR:<ip>:MONTO:<cantidad>
 ```
 
-## 🛠️ Tecnologías
+##  Tecnologías
 
 - **Lenguaje**: Java 17
 - **Sockets**: java.net.Socket, ServerSocket
 - **Concurrencia**: Thread, Runnable, CopyOnWriteArrayList, CountDownLatch
 - **Contenedores**: Docker, Docker Compose
-- **JRE Runtime**: Eclipse Temurin 17
 
-## 👤 Autor
 
-Proyecto desarrollado para la materia de Sistemas Distribuidos.
+##  Autor
 
-## 📄 Licencia
+Proyecto desarrollado para la materia de Sistemas Distribuidos por mi Alex Espinoza utilizando de base una plantilla realizada por el Ing.Galo Cornejo Profesor de la Facultad de Ingenieria.
+
+##  Licencia
 
 Este proyecto es de código abierto y está disponible para fines educativos.
 
-## 🤝 Contribuciones
+##  Contribuciones
 
 Las contribuciones son bienvenidas. Por favor:
 1. Fork el proyecto
@@ -358,10 +370,13 @@ Las contribuciones son bienvenidas. Por favor:
 4. Push a la rama (`git push origin feature/AmazingFeature`)
 5. Abre un Pull Request
 
-## 📞 Soporte
+##  Soporte
 
 Para preguntas o problemas, por favor abre un issue en GitHub.
 
 ---
 
-**Nota**: El tiempo de subasta está configurado en 2 minutos (120 segundos) para facilitar las pruebas. Puede ajustarse modificando la constante `TIEMPO_SUBASTA` en `ServidorSubasta.java`.
+**Notas Importantes**:
+- El tiempo de subasta está configurado en 2 minutos (120 segundos) para facilitar las pruebas. Puede ajustarse modificando la constante `TIEMPO_SUBASTA` en `ServidorSubasta.java`.
+- El servidor envía automáticamente la oferta ganadora cada 5 segundos a todos los clientes conectados, permitiendo que todos vean en tiempo real quién está ganando.
+- Los clientes pueden hacer ofertas cada 10 segundos, dándoles tiempo para reaccionar a las actualizaciones del servidor.

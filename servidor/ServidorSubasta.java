@@ -10,7 +10,7 @@ import java.util.concurrent.*;
  * @author Sistema de Subasta
  */
 public class ServidorSubasta {
-    private static final int TIEMPO_SUBASTA = 1200000; // Dos minutos en milisegundos
+    private static final int TIEMPO_SUBASTA = 120000; // Dos minutos en milisegundos
     private static List<HiloClienteSubasta> clientes = new CopyOnWriteArrayList<>();
     private static volatile boolean subastaActiva = true;
     private static long tiempoInicio;
@@ -94,6 +94,50 @@ public class ServidorSubasta {
 
         System.out.println("Temporizador iniciado: La subasta finalizará en " +
                          (TIEMPO_SUBASTA/1000) + " segundos");
+
+        // Iniciar broadcast periódico cada 5 segundos
+        iniciarBroadcastPeriodico();
+    }
+
+    /**
+     * Inicia un temporizador que envía la oferta ganadora cada 5 segundos
+     */
+    private static void iniciarBroadcastPeriodico() {
+        Timer broadcastTimer = new Timer();
+        broadcastTimer.scheduleAtFixedRate(new TimerTask() {
+            @Override
+            public void run() {
+                if (!subastaActiva) {
+                    broadcastTimer.cancel();
+                    return;
+                }
+                enviarActualizacionPeriodica();
+            }
+        }, 5000, 5000); // Primer broadcast a los 5 segundos, luego cada 5 segundos
+
+        System.out.println("Broadcast periódico iniciado: Actualizaciones cada 5 segundos");
+    }
+
+    /**
+     * Envía la oferta ganadora actual a todos los clientes conectados
+     */
+    private static void enviarActualizacionPeriodica() {
+        if (clientes.isEmpty()) {
+            return;
+        }
+
+        String update = obtenerPropuestaMasAlta() + ":TIEMPO:" + getTiempoRestante();
+        System.out.println("[BROADCAST] Enviando actualización a " + clientes.size() +
+                         " clientes: Propuesta más alta $" + propuestaMasAlta);
+
+        for (HiloClienteSubasta cliente : clientes) {
+            try {
+                cliente.enviarActualizacion(update);
+            } catch (Exception e) {
+                System.out.println("Error al enviar actualización a " +
+                                 cliente.getIpCliente() + ": " + e.getMessage());
+            }
+        }
     }
 
     /**
@@ -169,8 +213,8 @@ public class ServidorSubasta {
             if (nuevaPropuesta > propuestaMasAlta) {
                 propuestaMasAlta = nuevaPropuesta;
                 ipPropuestaMasAlta = ip;
-                System.out.println("*** NUEVA PROPUESTA MÁS ALTA: $" + nuevaPropuesta +
-                                 " de " + ip + " ***");
+                System.out.println(" NUEVA PROPUESTA MAS ALTA: $" + nuevaPropuesta +
+                                 " de " + ip + " ");
                 return true;
             }
             return false;

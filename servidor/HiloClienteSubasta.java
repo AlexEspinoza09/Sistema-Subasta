@@ -58,7 +58,8 @@ public class HiloClienteSubasta implements Runnable {
                         nuevaPropuesta, ipCliente);
 
                     // Enviar respuesta con la propuesta más alta actual y tiempo restante
-                    String respuesta = ServidorSubasta.obtenerPropuestaMasAlta() +
+                    // Usamos prefijo RESPUESTA: para diferenciar de los UPDATEs periódicos
+                    String respuesta = "RESPUESTA:" + ServidorSubasta.obtenerPropuestaMasAlta() +
                                      ":TIEMPO:" + ServidorSubasta.getTiempoRestante() +
                                      ":TU_PROPUESTA:" + (esLaMasAlta ? "GANANDO" : "PERDIENDO");
 
@@ -96,6 +97,17 @@ public class HiloClienteSubasta implements Runnable {
             }
         } catch (IOException e) {
             System.out.println("Error al enviar resultado a " + ipCliente + ": " + e.getMessage());
+        }
+    }
+
+    /**
+     * Envía una actualización periódica de la oferta ganadora al cliente
+     */
+    public void enviarActualizacion(String mensaje) {
+        try {
+            miSocket.enviaMensaje("UPDATE:" + mensaje);
+        } catch (IOException e) {
+            System.out.println("Error al enviar actualización a " + ipCliente + ": " + e.getMessage());
         }
     }
 

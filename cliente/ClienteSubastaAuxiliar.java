@@ -14,6 +14,12 @@ public class ClienteSubastaAuxiliar {
     private InetAddress maquinaServidora;
     private int puertoServidor;
     private double miUltimaPropuesta = 0.0;
+    private Thread hiloEscucha;
+    private volatile boolean escuchando = true;
+    private volatile boolean subastaActiva = true;
+    private volatile String ultimaActualizacion = "";
+    private volatile String ultimaRespuestaPropuesta = null;
+    private final Object lockRespuesta = new Object();
 
     /**
      * Constructor que establece la conexión con el servidor
@@ -28,6 +34,9 @@ public class ClienteSubastaAuxiliar {
         this.miSocket = new MiSocketStream(nombreMaquina, this.puertoServidor);
         System.out.println("\nConectado al servidor de subasta: " +
                          nombreMaquina + ":" + puertoServidor);
+
+        // Iniciar hilo de escucha para recibir actualizaciones periódicas
+        iniciarHiloEscucha();
     }
 
     /**
@@ -40,14 +49,26 @@ public class ClienteSubastaAuxiliar {
 
         miUltimaPropuesta = propuesta;
 
-        // Enviar propuesta al servidor
-        miSocket.enviaMensaje(String.valueOf(propuesta));
+        synchronized(lockRespuesta) {
+            ultimaRespuestaPropuesta = null;
 
-        // Recibir respuesta del servidor
-        String respuesta = miSocket.recibeMensaje();
+            // Enviar propuesta al servidor
+            miSocket.enviaMensaje(String.valueOf(propuesta));
 
-        // Parsear respuesta: "PROPUESTA_ALTA:ip:monto:TIEMPO:segundos:TU_PROPUESTA:estado"
-        return parsearEstado(respuesta);
+            // Esperar respuesta del hilo de escucha (máximo 10 segundos)
+            try {
+                lockRespuesta.wait(10000);
+            } catch (InterruptedException e) {
+                return new EstadoSubasta(false, "Timeout esperando respuesta", "", 0.0, 0, false);
+            }
+
+            if (ultimaRespuestaPropuesta == null) {
+                return new EstadoSubasta(false, "No se recibio respuesta del servidor", "", 0.0, 0, false);
+            }
+
+            // Parsear respuesta
+            return parsearEstado(ultimaRespuestaPropuesta);
+        }
     }
 
     /**
@@ -55,6 +76,22 @@ public class ClienteSubastaAuxiliar {
      */
     public String esperarResultadoFinal() throws SocketException, IOException {
         System.out.println("\nEsperando resultado final de la subasta...");
+
+        // Esperar a que el hilo de escucha reciba el resultado final
+        try {
+            if (hiloEscucha != null) {
+                hiloEscucha.join(30000); // Esperar máximo 30 segundos
+            }
+        } catch (InterruptedException e) {
+            System.out.println("Espera interrumpida: " + e.getMessage());
+        }
+
+        // Si el hilo de escucha ya recibió el resultado, usarlo
+        if (ultimaActualizacion != null && ultimaActualizacion.startsWith("GANADOR:")) {
+            return formatearResultadoFinal(ultimaActualizacion);
+        }
+
+        // Si no, intentar leer directamente
         String resultado = miSocket.recibeMensaje();
         return formatearResultadoFinal(resultado);
     }
@@ -66,6 +103,11 @@ public class ClienteSubastaAuxiliar {
         try {
             if (respuesta.startsWith("ERROR")) {
                 return new EstadoSubasta(false, respuesta, "", 0.0, 0, false);
+            }
+
+            // Remover prefijo RESPUESTA: si existe
+            if (respuesta.startsWith("RESPUESTA:")) {
+                respuesta = respuesta.substring(10); // Remover "RESPUESTA:"
             }
 
             // Formato: PROPUESTA_ALTA:ip:monto:TIEMPO:segundos:TU_PROPUESTA:estado
@@ -121,11 +163,87 @@ public class ClienteSubastaAuxiliar {
     }
 
     /**
+     * Verifica si la subasta sigue activa
+     */
+    public boolean estaSubastaActiva() {
+        return subastaActiva;
+    }
+
+    /**
      * Cierra la conexión con el servidor
      */
     public void cerrar() throws SocketException, IOException {
+        escuchando = false;
+        subastaActiva = false;
+        if (hiloEscucha != null) {
+            hiloEscucha.interrupt();
+        }
         miSocket.close();
         System.out.println("\nConexion cerrada con el servidor.");
+    }
+
+    /**
+     * Inicia un hilo para escuchar actualizaciones periódicas del servidor
+     */
+    private void iniciarHiloEscucha() {
+        hiloEscucha = new Thread(() -> {
+            try {
+                while (escuchando) {
+                    String mensaje = miSocket.recibeMensaje();
+
+                    if (mensaje == null) {
+                        System.out.println("\n[INFO] Conexion cerrada por el servidor");
+                        break;
+                    }
+
+                    // Manejar diferentes tipos de mensajes
+                    if (mensaje.startsWith("UPDATE:")) {
+                        // Actualización periódica (cada 5 segundos)
+                        procesarActualizacion(mensaje.substring(7));
+                    } else if (mensaje.startsWith("GANADOR:")) {
+                        // El resultado final
+                        ultimaActualizacion = mensaje;
+                        subastaActiva = false;
+                        escuchando = false;
+                        break;
+                    } else if (mensaje.startsWith("RESPUESTA:") || mensaje.startsWith("ERROR:")) {
+                        // Respuesta a una propuesta del cliente
+                        synchronized(lockRespuesta) {
+                            ultimaRespuestaPropuesta = mensaje;
+                            lockRespuesta.notifyAll();
+                        }
+                    }
+                }
+            } catch (IOException e) {
+                if (escuchando) {
+                    System.out.println("\nError en hilo de escucha: " + e.getMessage());
+                }
+            }
+        });
+        hiloEscucha.setDaemon(false); // No daemon para que no se cierre prematuramente
+        hiloEscucha.start();
+    }
+
+    /**
+     * Procesa y muestra una actualización periódica del servidor
+     */
+    private void procesarActualizacion(String update) {
+        try {
+            // Formato: PROPUESTA_ALTA:ip:monto:TIEMPO:segundos
+            String[] partes = update.split(":");
+            if (partes.length >= 5) {
+                String ipLider = partes[1];
+                double montoLider = Double.parseDouble(partes[2]);
+                long tiempoRestante = Long.parseLong(partes[4]);
+
+                System.out.println("\n[ACTUALIZACION DEL SERVIDOR]");
+                System.out.println("  Oferta ganadora: $" + montoLider + " (IP: " + ipLider + ")");
+                System.out.println("  Tiempo restante: " + tiempoRestante + " segundos");
+                System.out.println("-------------------------------------------");
+            }
+        } catch (Exception e) {
+            System.out.println("Error al procesar actualización: " + e.getMessage());
+        }
     }
 
     /**

@@ -52,18 +52,24 @@ public class ClienteSubasta {
             ClienteSubastaAuxiliar.EstadoSubasta estado = auxiliar.enviarPropuesta(propuesta);
             mostrarEstado(estado);
 
-            // Loop de propuestas cada 10 segundos
+            // Loop de propuestas - continuar mientras la subasta esté activa
             boolean continuar = true;
-            while (continuar && estado.tiempoRestante > 0) {
+            while (continuar && auxiliar.estaSubastaActiva()) {
                 // Esperar 10 segundos antes de permitir otra propuesta
                 puedeOfertar = false;
                 iniciarCuentaRegresiva();
 
                 // Solicitar nueva propuesta
-                System.out.print(" Ingrese nueva propuesta (o 'x' para salir): $");
+                System.out.print("\n Ingrese nueva propuesta (o 'x' para salir): $");
                 String input = br.readLine();
 
                 cancelarTemporizador();
+
+                // Verificar si la subasta terminó mientras esperábamos input
+                if (!auxiliar.estaSubastaActiva()) {
+                    System.out.println("\nLa subasta ha finalizado!");
+                    break;
+                }
 
                 if (input.trim().equalsIgnoreCase("x")) {
                     System.out.println(" Saliendo de la subasta...");
@@ -80,7 +86,13 @@ public class ClienteSubasta {
 
                     // Enviar nueva propuesta
                     estado = auxiliar.enviarPropuesta(nuevaPropuesta);
-                    mostrarEstado(estado);
+
+                    // Solo mostrar estado si recibimos respuesta válida
+                    if (estado.exito) {
+                        mostrarEstado(estado);
+                    } else {
+                        System.out.println("Error: " + estado.mensajeError);
+                    }
 
                 } catch (NumberFormatException e) {
                     System.out.println(" Entrada inválida. Debe ingresar un número.");
