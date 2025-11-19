@@ -41,7 +41,7 @@ services:
     ports:
       - "8080:8080"
     command: ["java", "socket.conconexion.servidor.ServidorSubasta", "8080"]
-    restart: "si"  # No reiniciar automaticamente
+    restart: "no"  # No reiniciar automaticamente
     networks:
       - red-sockets
 
