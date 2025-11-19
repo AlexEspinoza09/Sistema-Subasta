@@ -6,7 +6,7 @@ import java.util.TimerTask;
 
 /**
  * Cliente de Subasta - Lógica de presentación
- * Permite al usuario participar en una subasta con múltiples propuestas cada 10 segundos.
+ * Permite al usuario participar en una subasta con multiples propuestas cada 10 segundos.
  * @author Sistema de Subasta
  */
 public class ClienteSubasta {
@@ -44,7 +44,7 @@ public class ClienteSubasta {
             // Solicitar primera propuesta
             double propuesta = solicitarPropuesta(br, true);
             if (propuesta <= 0) {
-                System.out.println("Error: La propuesta debe ser un número positivo.");
+                System.out.println("Error: La propuesta debe ser un numero positivo.");
                 return;
             }
 
@@ -65,7 +65,7 @@ public class ClienteSubasta {
 
                 cancelarTemporizador();
 
-                // Verificar si la subasta terminó mientras esperábamos input
+                // Verificar si la subasta terminó mientras esperabamos input
                 if (!auxiliar.estaSubastaActiva()) {
                     System.out.println("\nLa subasta ha finalizado!");
                     break;
@@ -87,7 +87,7 @@ public class ClienteSubasta {
                     // Enviar nueva propuesta
                     estado = auxiliar.enviarPropuesta(nuevaPropuesta);
 
-                    // Solo mostrar estado si recibimos respuesta válida
+                    // Solo mostrar estado si recibimos respuesta valida
                     if (estado.exito) {
                         mostrarEstado(estado);
                     } else {
@@ -95,7 +95,7 @@ public class ClienteSubasta {
                     }
 
                 } catch (NumberFormatException e) {
-                    System.out.println(" Entrada inválida. Debe ingresar un número.");
+                    System.out.println(" Entrada invalida. Debe ingresar un numero.");
                 }
             }
 
@@ -152,7 +152,7 @@ public class ClienteSubasta {
             return;
         }
 
-        System.out.println("   Propuesta más alta: $" + estado.montoPropuestaMasAlta);
+        System.out.println("   Propuesta mas alta: $" + estado.montoPropuestaMasAlta);
         System.out.println("   IP líder: " + estado.ipPropuestaMasAlta);
         System.out.println("    Tiempo restante: " + estado.tiempoRestante + " segundos");
 

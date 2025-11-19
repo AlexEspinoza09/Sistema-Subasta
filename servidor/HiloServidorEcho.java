@@ -1,7 +1,7 @@
 package socket.conconexion.servidor;
 
 /**
- * Este módulo está diseñado para usarse con un servidor Echo concurrente.
+ * Este módulo esta diseñado para usarse con un servidor Echo concurrente.
  * Su método run lleva a cabo la lógica de una sesión de cliente.
  * @author M. L. Liu
  */

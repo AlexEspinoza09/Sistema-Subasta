@@ -17,10 +17,10 @@ COPY cliente/*.java socket/conconexion/cliente/
 # Compilar primero el servidor (incluye MiSocketStream)
 RUN javac socket/conconexion/servidor/*.java
 
-# Luego compilar el cliente (puede usar las clases del servidor)
+# Luego compilar el cliente 
 RUN javac -cp . socket/conconexion/cliente/*.java
 
-# Imagen final más ligera
+# Imagen final mas ligera
 FROM eclipse-temurin:17-jre
 
 # Directorio de trabajo

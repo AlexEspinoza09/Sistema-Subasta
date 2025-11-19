@@ -5,7 +5,7 @@ import java.util.concurrent.CountDownLatch;
 
 /**
  * Hilo que maneja la conexión con un cliente de subasta individual.
- * Permite múltiples propuestas del mismo cliente hasta que la subasta finalice.
+ * Permite multiples propuestas del mismo cliente hasta que la subasta finalice.
  * @author Sistema de Subasta
  */
 public class HiloClienteSubasta implements Runnable {
@@ -24,7 +24,7 @@ public class HiloClienteSubasta implements Runnable {
     @Override
     public void run() {
         try {
-            // Loop para recibir múltiples propuestas del mismo cliente
+            // Loop para recibir multiples propuestas del mismo cliente
             while (ServidorSubasta.estaActiva()) {
                 String mensajeRecibido = miSocket.recibeMensaje();
 
@@ -53,11 +53,11 @@ public class HiloClienteSubasta implements Runnable {
                     propuesta = nuevaPropuesta;
                     System.out.println("Cliente " + ipCliente + " ofrece: $" + propuesta);
 
-                    // Actualizar la propuesta más alta del servidor
+                    // Actualizar la propuesta mas alta del servidor
                     boolean esLaMasAlta = ServidorSubasta.actualizarPropuestaMasAlta(
                         nuevaPropuesta, ipCliente);
 
-                    // Enviar respuesta con la propuesta más alta actual y tiempo restante
+                    // Enviar respuesta con la propuesta mas alta actual y tiempo restante
                     // Usamos prefijo RESPUESTA: para diferenciar de los UPDATEs periódicos
                     String respuesta = "RESPUESTA:" + ServidorSubasta.obtenerPropuestaMasAlta() +
                                      ":TIEMPO:" + ServidorSubasta.getTiempoRestante() +
@@ -66,8 +66,8 @@ public class HiloClienteSubasta implements Runnable {
                     miSocket.enviaMensaje(respuesta);
 
                 } catch (NumberFormatException e) {
-                    System.out.println("Error: Propuesta inválida de " + ipCliente);
-                    miSocket.enviaMensaje("ERROR:Propuesta inválida. Debe ser un número.");
+                    System.out.println("Error: Propuesta invalida de " + ipCliente);
+                    miSocket.enviaMensaje("ERROR:Propuesta invalida. Debe ser un numero.");
                 }
             }
 
@@ -112,12 +112,24 @@ public class HiloClienteSubasta implements Runnable {
     }
 
     /**
+     * Notifica al cliente que la subasta ha iniciado
+     */
+    public void notificarInicioSubasta(long tiempoRestante) {
+        try {
+            miSocket.enviaMensaje("SUBASTA_INICIADA:TIEMPO:" + tiempoRestante);
+            System.out.println("Cliente " + ipCliente + " notificado: subasta iniciada");
+        } catch (IOException e) {
+            System.out.println("Error al notificar inicio a " + ipCliente + ": " + e.getMessage());
+        }
+    }
+
+    /**
      * Cierra la conexión con el cliente
      */
     public void cerrarConexion() {
         try {
             if (!resultadoEnviado) {
-                latch.countDown(); // Libera el await() si aún no se envió resultado
+                latch.countDown(); // Libera el await() si aun no se envió resultado
             }
             miSocket.close();
             System.out.println("Conexión cerrada con " + ipCliente);

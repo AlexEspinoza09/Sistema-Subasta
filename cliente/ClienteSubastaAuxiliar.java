@@ -6,7 +6,7 @@ import java.io.*;
 
 /**
  * Cliente de Subasta - Lógica de aplicación
- * Maneja la comunicación con el servidor de subasta permitiendo múltiples propuestas.
+ * Maneja la comunicación con el servidor de subasta permitiendo multiples propuestas.
  * @author Sistema de Subasta
  */
 public class ClienteSubastaAuxiliar {
@@ -55,7 +55,7 @@ public class ClienteSubastaAuxiliar {
             // Enviar propuesta al servidor
             miSocket.enviaMensaje(String.valueOf(propuesta));
 
-            // Esperar respuesta del hilo de escucha (máximo 10 segundos)
+            // Esperar respuesta del hilo de escucha (maximo 10 segundos)
             try {
                 lockRespuesta.wait(10000);
             } catch (InterruptedException e) {
@@ -80,7 +80,7 @@ public class ClienteSubastaAuxiliar {
         // Esperar a que el hilo de escucha reciba el resultado final
         try {
             if (hiloEscucha != null) {
-                hiloEscucha.join(30000); // Esperar máximo 30 segundos
+                hiloEscucha.join(30000); // Esperar maximo 30 segundos
             }
         } catch (InterruptedException e) {
             System.out.println("Espera interrumpida: " + e.getMessage());
@@ -141,7 +141,7 @@ public class ClienteSubastaAuxiliar {
                 StringBuilder sb = new StringBuilder();
                 sb.append("\n  Ganador: ").append(ipGanador).append("\n");
                 sb.append("  Monto ganador: $").append(montoGanador).append("\n");
-                sb.append("  Tu última propuesta: $").append(miUltimaPropuesta).append("\n\n");
+                sb.append("  Tu ultima propuesta: $").append(miUltimaPropuesta).append("\n\n");
 
                 // Determinar si ganó o perdió
                 if (miUltimaPropuesta == montoGanador) {
@@ -197,7 +197,10 @@ public class ClienteSubastaAuxiliar {
                     }
 
                     // Manejar diferentes tipos de mensajes
-                    if (mensaje.startsWith("UPDATE:")) {
+                    if (mensaje.startsWith("SUBASTA_INICIADA:")) {
+                        // La subasta ha comenzado
+                        procesarInicioSubasta(mensaje);
+                    } else if (mensaje.startsWith("UPDATE:")) {
                         // Actualización periódica (cada 5 segundos)
                         procesarActualizacion(mensaje.substring(7));
                     } else if (mensaje.startsWith("GANADOR:")) {
@@ -222,6 +225,28 @@ public class ClienteSubastaAuxiliar {
         });
         hiloEscucha.setDaemon(false); // No daemon para que no se cierre prematuramente
         hiloEscucha.start();
+    }
+
+    /**
+     * Procesa el mensaje de inicio de subasta
+     */
+    private void procesarInicioSubasta(String mensaje) {
+        try {
+            // Formato: SUBASTA_INICIADA:TIEMPO:segundos
+            String[] partes = mensaje.split(":");
+            if (partes.length >= 3) {
+                long tiempoRestante = Long.parseLong(partes[2]);
+
+                System.out.println("\n===========================================");
+                System.out.println("     LA SUBASTA HA INICIADO!");
+                System.out.println("===========================================");
+                System.out.println("  Tiempo de subasta: " + tiempoRestante + " segundos");
+                System.out.println("  Puedes hacer ofertas cada 10 segundos");
+                System.out.println("===========================================\n");
+            }
+        } catch (Exception e) {
+            System.out.println("Error al procesar inicio de subasta: " + e.getMessage());
+        }
     }
 
     /**

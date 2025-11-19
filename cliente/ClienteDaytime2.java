@@ -13,15 +13,15 @@ public class ClienteDaytime2 {
         	BufferedReader br = new BufferedReader(is);
         try {
         	System.out.println("Bienvenido al cliente Daytime.\n" +
-        			           "¿Cuál es el nombre de la máquina servidora?");
+        			           "¿Cual es el nombre de la maquina servidora?");
         	String nombreMaquina = br.readLine( );
         	if (nombreMaquina.length() == 0) // si el usuario no introduce un nombre
-        		nombreMaquina = "localhost"; // usa el nombre de máquina por defecto
-        	System.out.println("¿Cuál es el n° de puerto de la máquina servidora?");
+        		nombreMaquina = "localhost"; // usa el nombre de maquina por defecto
+        	System.out.println("¿Cual es el n° de puerto de la maquina servidora?");
         	String numPuerto = br.readLine();
         	if (numPuerto.length () == 0)
-        		numPuerto = "13"; // número de puerto por defecto
-        	System.out.println("Aquí está la marca de tiempo recibida del servidor: "
+        		numPuerto = "13"; // numero de puerto por defecto
+        	System.out.println("Aquí esta la marca de tiempo recibida del servidor: "
         						+ ClienteDaytimeAuxiliar2.obtenerMarcaTiempo(nombreMaquina,numPuerto));
         } // fin de try
         catch (Exception ex) {

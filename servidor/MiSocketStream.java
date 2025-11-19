@@ -29,7 +29,7 @@ public class MiSocketStream extends Socket {
     	InputStream flujoEntrada = socket.getInputStream();
     	entrada = new BufferedReader(new InputStreamReader(flujoEntrada));
     	OutputStream flujoSalida = socket.getOutputStream();
-    	// crea un objeto PrintWriter para salida en modo carácter
+    	// crea un objeto PrintWriter para salida en modo caracter
     	salida = new PrintWriter(new OutputStreamWriter(flujoSalida));
     }
 

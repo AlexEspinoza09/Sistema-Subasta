@@ -13,11 +13,11 @@ public class ClienteEcho2 {
 		BufferedReader br = new BufferedReader(is);
 		try {
 			System.out.println("Bienvenido al cliente Echo.\n" +
-							   "¿Cuál es el nombre de la máquina servidora?");
+							   "¿Cual es el nombre de la maquina servidora?");
 			String nombreMaquina = br.readLine( );
 			if (nombreMaquina.length() == 0) // si el usuario no introdujo un nombre
-				nombreMaquina = "localhost"; // utiliza nombre de máquina por defecto
-			System.out.println("¿Cuál es el n° puerto de la máquina servidora?");
+				nombreMaquina = "localhost"; // utiliza nombre de maquina por defecto
+			System.out.println("¿Cual es el n° puerto de la maquina servidora?");
 			String numPuerto = br.readLine();
 			if (numPuerto.length() == 0)
 				numPuerto = "7"; // n�mero de puerto por defecto
@@ -26,7 +26,7 @@ public class ClienteEcho2 {
 			String mensaje, eco;
 			while (!hecho) {
 				System.out.println("Introduzca una línea para recibir el eco "
-									+ " del servidor, o un único punto para terminar.");
+									+ " del servidor, o un unico punto para terminar.");
 				mensaje = br.readLine( );
 				if ((mensaje.trim( )).equals (".")){
 					hecho = true;

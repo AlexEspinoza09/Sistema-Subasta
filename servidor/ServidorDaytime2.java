@@ -18,7 +18,7 @@ public class ServidorDaytime2 {
 			// instancia un socket stream para aceptar
 			// las conexiones
 			ServerSocket miSocketConexion = new ServerSocket(puertoServidor);
-			System.out.println("El servidor Daytime está listo.");
+			System.out.println("El servidor Daytime esta listo.");
 			while (true) { // bucle infinito
 				// espera para aceptar una conexión
 				/**/    System.out.println("Espera una conexión.");

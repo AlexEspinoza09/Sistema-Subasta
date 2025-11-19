@@ -28,7 +28,7 @@ public class ServidorEcho3 {
 				// Arranca un hilo para manejar la sesión de cliente
 				Thread elHilo = new Thread(new HiloServidorEcho(miSocketDatos));
 				elHilo.start();
-				// y continúa con el siguiente cliente
+				// y continua con el siguiente cliente
 			} // fin de while infinito
 		} // fin de try
 		catch (Exception ex) {

@@ -1,6 +1,6 @@
 # Sistema de Comunicación Cliente-Servidor con Sockets TCP
 
-Proyecto de sistemas distribuidos que implementa múltiples protocolos de comunicación cliente-servidor utilizando sockets TCP en Java. Incluye arquitecturas secuenciales, concurrentes y un sistema de subasta en tiempo real.
+Proyecto de sistemas distribuidos que implementa multiples protocolos de comunicación cliente-servidor utilizando sockets TCP en Java. Incluye arquitecturas secuenciales, concurrentes y un sistema de subasta en tiempo real.
 
 ##  Descripción General
 
@@ -8,7 +8,7 @@ Este proyecto demuestra diferentes patrones de comunicación en sistemas distrib
 
 - **Servidor Daytime**: Devuelve la fecha y hora actual del servidor
 - **Servidor Echo**: Repite los mensajes enviados por el cliente (versiones secuencial y concurrente)
-- **Sistema de Subasta**: Sistema de subasta en tiempo real con múltiples oferentes
+- **Sistema de Subasta**: Sistema de subasta en tiempo real con multiples oferentes
 
 ##  Arquitectura
 
@@ -43,7 +43,7 @@ Clase wrapper que simplifica la comunicación por sockets:
 3. **ServidorEcho3** (Puerto 7)
    - Arquitectura: Concurrente (multi-thread)
    - Funcionalidad: Echo de mensajes hasta recibir "."
-   - Múltiples clientes simultáneos
+   - Multiples clientes simultaneos
    - Usa HiloServidorEcho para cada cliente
 
 4. **ServidorSubasta** (Puerto 8080)
@@ -51,7 +51,7 @@ Clase wrapper que simplifica la comunicación por sockets:
    - Funcionalidad: Sistema de subasta en tiempo real
    - Duración: 2 minutos (configurable)
    - Características:
-     - Múltiples oferentes simultáneos
+     - Multiples oferentes simultaneos
      - Actualizaciones en tiempo real
      - Broadcast del ganador a todos los participantes
 
@@ -70,16 +70,16 @@ Ejemplos:
 
 ### Características
 
-- **Ofertas múltiples**: Cada cliente puede hacer múltiples ofertas durante la subasta
+- **Ofertas multiples**: Cada cliente puede hacer multiples ofertas durante la subasta
 - **Intervalo de ofertas**: 10 segundos entre cada propuesta
 - **Tiempo total**: 2 minutos (120 segundos)
-- **Broadcast automático**: El servidor envía la oferta ganadora cada 5 segundos a todos los clientes
+- **Broadcast automatico**: El servidor envía la oferta ganadora cada 5 segundos a todos los clientes
 - **Feedback en tiempo real**:
-  - Propuesta más alta actual
+  - Propuesta mas alta actual
   - IP del líder
   - Tiempo restante
   - Estado personal (GANANDO/PERDIENDO)
-  - Actualizaciones automáticas cada 5 segundos
+  - Actualizaciones automaticas cada 5 segundos
 
 ### Flujo del Sistema
 
@@ -88,16 +88,16 @@ Ejemplos:
 3. **Durante la subasta**:
    - Cliente puede ofertar cada 10 segundos
    - Servidor envía broadcast cada 5 segundos con la oferta ganadora actual
-   - Todos los clientes reciben actualizaciones automáticas
+   - Todos los clientes reciben actualizaciones automaticas
 4. Al finalizar los 2 minutos:
-   - Servidor determina ganador (propuesta más alta)
-   - Notifica a TODOS los clientes simultáneamente
+   - Servidor determina ganador (propuesta mas alta)
+   - Notifica a TODOS los clientes simultaneamente
    - Cierra todas las conexiones
 
 ### Thread Safety
 
 - `CopyOnWriteArrayList` para lista de clientes
-- `synchronized` para propuesta más alta
+- `synchronized` para propuesta mas alta
 - `CountDownLatch` para sincronizar broadcast final
 
 ##  Compilación y Ejecución
@@ -151,10 +151,10 @@ java socket.conconexion.cliente.ClienteSubasta
 
 ##  Despliegue con Docker 🐳
 
-### Construcción de Imágenes
+### Construcción de Imagenes
 
 ```bash
-# Construir todas las imágenes
+# Construir todas las imagenes
 docker-compose build
 
 # Construir sin caché
@@ -201,7 +201,7 @@ nc localhost 7
 
 ##  Ejemplos de Uso
 
-### Ejemplo 1: Sistema de Subasta con Múltiples Clientes
+### Ejemplo 1: Sistema de Subasta con Multiples Clientes
 
 **Terminal 1 - Servidor:**
 ```bash
@@ -235,7 +235,7 @@ java socket.conconexion.cliente.ClienteSubasta
 # Estado: ESTAS GANANDO LA SUBASTA!
 ```
 
-Después de 2 minutos, todos los clientes reciben el resultado simultáneamente.
+Después de 2 minutos, todos los clientes reciben el resultado simultaneamente.
 
 ### Ejemplo 2: Echo Concurrente
 
@@ -244,7 +244,7 @@ Después de 2 minutos, todos los clientes reciben el resultado simultáneamente.
 java socket.conconexion.cliente.ClienteEcho2
 # Enviar mensajes, el servidor responde con eco
 
-# Terminal 2 (simultáneo)
+# Terminal 2 (simultaneo)
 java socket.conconexion.cliente.ClienteEcho2
 # Ambos clientes funcionan al mismo tiempo
 ```
@@ -268,7 +268,7 @@ docker push <account-id>.dkr.ecr.us-east-1.amazonaws.com/servidor-sockets:latest
 1. Instalar Docker y Docker Compose en instancia EC2
 2. Clonar repositorio
 3. Ejecutar `docker-compose up -d`
-4. Configurar Security Group para permitir tráfico TCP en puertos necesarios
+4. Configurar Security Group para permitir trafico TCP en puertos necesarios
 
 ##  Estructura del Proyecto
 
@@ -338,7 +338,7 @@ Modificables en cada archivo de servidor:
 Cliente -> Servidor: <monto_propuesta>
 Servidor -> Cliente: PROPUESTA_ALTA:<ip>:<monto>:TIEMPO:<seg>:TU_PROPUESTA:<GANANDO|PERDIENDO>
 
-[Cada 5 segundos - Broadcast automático]
+[Cada 5 segundos - Broadcast automatico]
 Servidor -> Todos: UPDATE:PROPUESTA_ALTA:<ip>:<monto>:TIEMPO:<segundos_restantes>
 
 [Al finalizar la subasta]
@@ -359,7 +359,7 @@ Proyecto desarrollado para la materia de Sistemas Distribuidos por mi Alex Espin
 
 ##  Licencia
 
-Este proyecto es de código abierto y está disponible para fines educativos.
+Este proyecto es de código abierto y esta disponible para fines educativos.
 
 ##  Contribuciones
 
@@ -377,6 +377,6 @@ Para preguntas o problemas, por favor abre un issue en GitHub.
 ---
 
 **Notas Importantes**:
-- El tiempo de subasta está configurado en 2 minutos (120 segundos) para facilitar las pruebas. Puede ajustarse modificando la constante `TIEMPO_SUBASTA` en `ServidorSubasta.java`.
-- El servidor envía automáticamente la oferta ganadora cada 5 segundos a todos los clientes conectados, permitiendo que todos vean en tiempo real quién está ganando.
-- Los clientes pueden hacer ofertas cada 10 segundos, dándoles tiempo para reaccionar a las actualizaciones del servidor.
+- El tiempo de subasta esta configurado en 2 minutos (120 segundos) para facilitar las pruebas. Puede ajustarse modificando la constante `TIEMPO_SUBASTA` en `ServidorSubasta.java`.
+- El servidor envía automaticamente la oferta ganadora cada 5 segundos a todos los clientes conectados, permitiendo que todos vean en tiempo real quién esta ganando.
+- Los clientes pueden hacer ofertas cada 10 segundos, dandoles tiempo para reaccionar a las actualizaciones del servidor.
