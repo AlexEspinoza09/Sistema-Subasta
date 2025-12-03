@@ -1,29 +1,25 @@
-# Archivos compilados (se compilan en el contenedor)
+# Ignorar archivos compilados
 *.class
+socket/
 
-# Git
-.git
+# Ignorar archivos de documentación (excepto los necesarios)
+README*.md
+RESUMEN*.md
+DOCKER*.md
+
+# Ignorar scripts de compilación
+*.sh
+*.bat
+
+# Ignorar Docker files
+Dockerfile*
+docker-compose*.yml
+
+# Ignorar Git
+.git/
 .gitignore
 
-# Docker
-Dockerfile
-docker-compose.yml
-.dockerignore
-
-# Documentación
-CLAUDE.md
-README.md
-*.md
-
-# IDE
-.vscode
-.idea
-*.iml
-.eclipse
-.classpath
-.project
-.settings
-
-# OS
+# Ignorar archivos temporales
+*.log
+*.tmp
 .DS_Store
-Thumbs.db

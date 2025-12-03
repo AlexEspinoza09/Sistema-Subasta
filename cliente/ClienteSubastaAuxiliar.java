@@ -30,13 +30,74 @@ public class ClienteSubastaAuxiliar {
         this.maquinaServidora = InetAddress.getByName(nombreMaquina);
         this.puertoServidor = Integer.parseInt(numPuerto);
 
-        // Conectar al servidor
-        this.miSocket = new MiSocketStream(nombreMaquina, this.puertoServidor);
-        System.out.println("\nConectado al servidor de subasta: " +
-                         nombreMaquina + ":" + puertoServidor);
+        // Conectar al servidor (con manejo de redirección)
+        conectarConRedireccion(nombreMaquina, this.puertoServidor);
 
         // Iniciar hilo de escucha para recibir actualizaciones periódicas
         iniciarHiloEscucha();
+    }
+
+    /**
+     * Conecta al servidor y maneja redirecciones automáticamente
+     */
+    private void conectarConRedireccion(String host, int puerto)
+            throws SocketException, UnknownHostException, IOException {
+
+        int intentos = 0;
+        final int MAX_REDIRECCIONES = 5;
+
+        while (intentos < MAX_REDIRECCIONES) {
+            try {
+                this.miSocket = new MiSocketStream(host, puerto);
+                System.out.println("\nConectado al servidor: " + host + ":" + puerto);
+
+                // Leer primer mensaje para verificar si es redirección
+                this.miSocket.getSocket().setSoTimeout(3000);
+                String primerMensaje = this.miSocket.recibeMensaje();
+
+                if (primerMensaje != null && primerMensaje.startsWith("REDIRECCION:")) {
+                    // Servidor nos redirige al coordinador
+                    System.out.println("[INFO] Servidor redirigiendo al coordinador...");
+
+                    String[] partes = primerMensaje.split(":");
+                    if (partes.length >= 3) {
+                        String nuevoHost = partes[1];
+                        int nuevoPuerto = Integer.parseInt(partes[2]);
+
+                        System.out.println("[REDIRECCION] Conectando a coordinador: " +
+                                         nuevoHost + ":" + nuevoPuerto);
+
+                        // Cerrar conexión actual
+                        this.miSocket.close();
+
+                        // Actualizar destino
+                        host = nuevoHost;
+                        puerto = nuevoPuerto;
+                        intentos++;
+                        continue;
+                    } else {
+                        throw new IOException("Formato de redirección inválido: " + primerMensaje);
+                    }
+                } else if (primerMensaje != null && primerMensaje.startsWith("ERROR:")) {
+                    throw new IOException(primerMensaje.substring(6));
+                } else {
+                    // No es redirección, preparar para recibir mensajes normales
+                    // Poner el mensaje de vuelta en la cola si es necesario
+                    // (en este caso, el hilo de escucha lo manejará)
+                    this.miSocket.getSocket().setSoTimeout(0);
+                    System.out.println("[CONECTADO] Servidor de subasta activo");
+                    return;
+                }
+
+            } catch (SocketTimeoutException e) {
+                // No hubo redirección, conexión exitosa
+                this.miSocket.getSocket().setSoTimeout(0);
+                System.out.println("[CONECTADO] Servidor de subasta activo");
+                return;
+            }
+        }
+
+        throw new IOException("Máximo de redirecciones alcanzado (" + MAX_REDIRECCIONES + ")");
     }
 
     /**

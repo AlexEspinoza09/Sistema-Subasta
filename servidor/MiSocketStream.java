@@ -47,4 +47,15 @@ public class MiSocketStream extends Socket {
     	return mensaje;
     } // fin de recibeMensaje
 
+    public Socket getSocket() {
+    	return socket;
+    } // fin de getSocket
+
+    @Override
+    public void close() throws IOException {
+    	if (socket != null) {
+    		socket.close();
+    	}
+    } // fin de close
+
 } //fin de class

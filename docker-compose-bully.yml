@@ -1,0 +1,105 @@
+version: '3.8'
+
+# Docker Compose para Sistema de Subasta Distribuido con Protocolo Bully
+#
+# Este archivo levanta 3 servidores de subasta que se coordinan usando
+# el algoritmo Bully para elección de líder.
+#
+# Uso:
+#   docker-compose -f docker-compose-bully.yml up
+#   docker-compose -f docker-compose-bully.yml up -d  (modo detached)
+#   docker-compose -f docker-compose-bully.yml down
+#   docker-compose -f docker-compose-bully.yml logs -f
+
+services:
+  # Nodo 1 - Prioridad BAJA (ID=1)
+  # Este nodo solo será coordinador si los nodos 2 y 3 fallan
+  nodo-bully-1:
+    build:
+      context: .
+      dockerfile: Dockerfile.bully
+    container_name: subasta-bully-nodo-1
+    hostname: nodo-bully-1
+    environment:
+      - NODE_ID=1
+      - CLIENT_PORT=8080
+      - COORD_PORT=9080
+      - EXTERNAL_HOST=localhost  # Para redirecciones a clientes externos
+    ports:
+      - "8080:8080"  # Puerto para clientes
+      - "9080:9080"  # Puerto para coordinación Bully
+    command: ["java", "socket.conconexion.servidor.ServidorSubastaBully",
+              "1", "8080", "9080", "nodos-docker-bridge.conf", "nodo-bully-1"]
+    networks:
+      - red-bully
+    restart: unless-stopped
+    volumes:
+      - ./nodos-docker-bridge.conf:/app/nodos-docker-bridge.conf:ro
+
+  # Nodo 2 - Prioridad MEDIA (ID=2)
+  # Este nodo será coordinador si el nodo 3 falla
+  nodo-bully-2:
+    build:
+      context: .
+      dockerfile: Dockerfile.bully
+    container_name: subasta-bully-nodo-2
+    hostname: nodo-bully-2
+    environment:
+      - NODE_ID=2
+      - CLIENT_PORT=8081
+      - COORD_PORT=9081
+      - EXTERNAL_HOST=localhost  # Para redirecciones a clientes externos
+    ports:
+      - "8081:8081"  # Puerto para clientes
+      - "9081:9081"  # Puerto para coordinación Bully
+    command: ["java", "socket.conconexion.servidor.ServidorSubastaBully",
+              "2", "8081", "9081", "nodos-docker-bridge.conf", "nodo-bully-2"]
+    networks:
+      - red-bully
+    restart: unless-stopped
+    volumes:
+      - ./nodos-docker-bridge.conf:/app/nodos-docker-bridge.conf:ro
+    depends_on:
+      - nodo-bully-1
+
+  # Nodo 3 - Prioridad ALTA (ID=3)
+  # Este nodo será el coordinador por defecto (mayor ID)
+  nodo-bully-3:
+    build:
+      context: .
+      dockerfile: Dockerfile.bully
+    container_name: subasta-bully-nodo-3
+    hostname: nodo-bully-3
+    environment:
+      - NODE_ID=3
+      - CLIENT_PORT=8082
+      - COORD_PORT=9082
+      - EXTERNAL_HOST=localhost  # Para redirecciones a clientes externos
+    ports:
+      - "8082:8082"  # Puerto para clientes
+      - "9082:9082"  # Puerto para coordinación Bully
+    command: ["java", "socket.conconexion.servidor.ServidorSubastaBully",
+              "3", "8082", "9082", "nodos-docker-bridge.conf", "nodo-bully-3"]
+    networks:
+      - red-bully
+    restart: unless-stopped
+    volumes:
+      - ./nodos-docker-bridge.conf:/app/nodos-docker-bridge.conf:ro
+    depends_on:
+      - nodo-bully-1
+      - nodo-bully-2
+
+networks:
+  red-bully:
+    driver: bridge
+    name: red-subasta-bully
+
+# NOTA: Usamos red bridge (normal) porque network_mode: host NO funciona
+# en Windows Docker Desktop. Los contenedores se comunican entre sí usando
+# sus hostnames (nodo-bully-1, nodo-bully-2, nodo-bully-3) y exponen
+# puertos al host para que los clientes puedan conectarse.
+
+# Para conectar clientes desde el host:
+# java socket.conconexion.cliente.ClienteSubasta
+# Servidor: localhost
+# Puerto: 8080, 8081 o 8082 (cualquiera funciona, serás redirigido)

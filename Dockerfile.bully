@@ -1,0 +1,47 @@
+# Dockerfile para Sistema de Subasta Distribuido con Protocolo Bully
+# Multi-stage build para reducir el tamaño de la imagen final
+
+FROM eclipse-temurin:17-jdk AS builder
+
+# Directorio de trabajo
+WORKDIR /app
+
+# Crear estructura de directorios para los paquetes
+RUN mkdir -p socket/conconexion/servidor && \
+    mkdir -p socket/conconexion/cliente
+
+# Copiar archivos de servidor
+COPY servidor/*.java socket/conconexion/servidor/
+
+# Copiar archivos de cliente
+COPY cliente/*.java socket/conconexion/cliente/
+
+# Copiar archivo de configuración de nodos
+COPY nodos.conf /app/
+
+# Compilar TODOS los archivos del servidor (incluye clases Bully)
+RUN javac -encoding UTF-8 socket/conconexion/servidor/*.java
+
+# Compilar el cliente
+RUN javac -encoding UTF-8 -cp . socket/conconexion/cliente/*.java
+
+# Imagen final más ligera
+FROM eclipse-temurin:17-jre
+
+# Directorio de trabajo
+WORKDIR /app
+
+# Copiar toda la estructura de paquetes compilada desde el builder
+COPY --from=builder /app/socket ./socket
+
+# Copiar archivo de configuración
+COPY --from=builder /app/nodos.conf ./nodos.conf
+
+# Exponer puertos
+# Puertos de clientes: 8080, 8081, 8082
+# Puertos de coordinación: 9080, 9081, 9082
+EXPOSE 8080 8081 8082 9080 9081 9082
+
+# Por defecto, ejecutar nodo 1
+# Se sobrescribe con docker-compose
+CMD ["java", "socket.conconexion.servidor.ServidorSubastaBully", "1", "8080", "9080", "nodos.conf"]
