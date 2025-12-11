@@ -6,7 +6,8 @@
       "Bash(find:*)",
       "Bash(docker logs:*)",
       "Bash(docker-compose:*)",
-      "Bash(docker stop:*)"
+      "Bash(docker stop:*)",
+      "Bash(docker start:*)"
     ],
     "deny": [],
     "ask": []

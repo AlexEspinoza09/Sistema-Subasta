@@ -457,8 +457,14 @@ public class ServidorSubastaBully {
     private void enviarActualizacionPeriodica() {
         if (clientes.isEmpty()) return;
 
+        // Obtener del estado replicado
+        EstadoSubastaReplicado estado = gestorEleccion.getEstadoSubasta();
+        Map.Entry<String, Double> ganador = estado.getOfertaGanadora();
+        double montoActual = (ganador != null) ? ganador.getValue() : 0.0;
+
         String update = obtenerPropuestaMasAlta() + ":TIEMPO:" + getTiempoRestante();
-        System.out.println("[BROADCAST] Propuesta más alta: $" + propuestaMasAlta);
+        System.out.println("[BROADCAST] Propuesta más alta: $" + montoActual +
+                         " (Estado replicado: " + estado.getCantidadOfertas() + " ofertas)");
 
         for (HiloClienteSubastaBully cliente : clientes) {
             try {
@@ -481,19 +487,16 @@ public class ServidorSubastaBully {
             return;
         }
 
-        HiloClienteSubastaBully ganador = null;
-        double propuestaGanadora = -1;
+        // Obtener ganador del estado replicado
+        EstadoSubastaReplicado estado = gestorEleccion.getEstadoSubasta();
+        Map.Entry<String, Double> entradaGanadora = estado.getOfertaGanadora();
 
-        for (HiloClienteSubastaBully cliente : clientes) {
-            double propuesta = cliente.getPropuesta();
-            if (propuesta > propuestaGanadora) {
-                propuestaGanadora = propuesta;
-                ganador = cliente;
-            }
-        }
+        if (entradaGanadora != null) {
+            String ipGanador = entradaGanadora.getKey();
+            double propuestaGanadora = entradaGanadora.getValue();
+            String mensaje = "GANADOR:" + ipGanador + ":MONTO:" + propuestaGanadora;
 
-        if (ganador != null) {
-            String mensaje = "GANADOR:" + ganador.getIpCliente() + ":MONTO:" + propuestaGanadora;
+            System.out.println("[GANADOR] " + ipGanador + " con $" + propuestaGanadora);
 
             for (HiloClienteSubastaBully cliente : clientes) {
                 cliente.enviarResultado(mensaje);
@@ -517,15 +520,31 @@ public class ServidorSubastaBully {
             propuestaMasAlta = 0.0;
             ipPropuestaMasAlta = "ninguno";
         }
+
+        // Limpiar estado replicado si soy coordinador
+        if (gestorEleccion.esCoordinador()) {
+            gestorEleccion.getEstadoSubasta().limpiar();
+            gestorEleccion.replicarEstado(); // Propagar limpieza a otros nodos
+        }
+
         estadoSubasta = EstadoSubasta.ESPERANDO;
         System.out.println("[RESET] Listo para nueva subasta\n");
     }
 
     public boolean actualizarPropuestaMasAlta(double nuevaPropuesta, String ip) {
         synchronized(lockSubasta) {
-            if (nuevaPropuesta > propuestaMasAlta) {
-                propuestaMasAlta = nuevaPropuesta;
-                ipPropuestaMasAlta = ip;
+            // Registrar oferta en el estado replicado
+            // El gestor de elección se encargará de replicar a todos los nodos
+            if (gestorEleccion.esCoordinador()) {
+                gestorEleccion.registrarOferta(ip, nuevaPropuesta);
+            }
+
+            // Obtener la oferta ganadora actual del estado replicado
+            EstadoSubastaReplicado estado = gestorEleccion.getEstadoSubasta();
+            Map.Entry<String, Double> ganadorActual = estado.getOfertaGanadora();
+
+            // Verificar si la nueva propuesta es la más alta
+            if (ganadorActual != null && ganadorActual.getKey().equals(ip)) {
                 System.out.println("[NUEVA ALTA] $" + nuevaPropuesta + " de " + ip);
                 return true;
             }
@@ -535,10 +554,14 @@ public class ServidorSubastaBully {
 
     public String obtenerPropuestaMasAlta() {
         synchronized(lockSubasta) {
-            if (propuestaMasAlta == 0.0) {
+            // Obtener del estado replicado
+            EstadoSubastaReplicado estado = gestorEleccion.getEstadoSubasta();
+            Map.Entry<String, Double> ganador = estado.getOfertaGanadora();
+
+            if (ganador == null) {
                 return "PROPUESTA_ALTA:ninguno:0.0";
             }
-            return "PROPUESTA_ALTA:" + ipPropuestaMasAlta + ":" + propuestaMasAlta;
+            return "PROPUESTA_ALTA:" + ganador.getKey() + ":" + ganador.getValue();
         }
     }
 

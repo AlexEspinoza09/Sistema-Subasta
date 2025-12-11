@@ -18,7 +18,8 @@ public class MensajeBully implements Serializable {
         HEARTBEAT,     // Latido del coordinador para verificar que está vivo
         PING,          // Solicitud de estado
         ESTADO,        // Respuesta con información del nodo
-        REDIRECCION    // Redirigir cliente al coordinador
+        REDIRECCION,   // Redirigir cliente al coordinador
+        SYNC_ESTADO    // Sincronización del estado de la subasta
     }
 
     private TipoMensaje tipo;
@@ -28,6 +29,7 @@ public class MensajeBully implements Serializable {
     private int puertoCoordinador;  // Puerto del coordinador (para redirección)
     private String datos;           // Datos adicionales
     private long timestamp;         // Timestamp del mensaje
+    private EstadoSubastaReplicado estadoSubasta; // Estado de la subasta (para SYNC_ESTADO)
 
     /**
      * Constructor para mensajes básicos
@@ -55,6 +57,14 @@ public class MensajeBully implements Serializable {
     public MensajeBully(TipoMensaje tipo, int idEmisor, String datos) {
         this(tipo, idEmisor);
         this.datos = datos;
+    }
+
+    /**
+     * Constructor para mensaje SYNC_ESTADO
+     */
+    public MensajeBully(TipoMensaje tipo, int idEmisor, EstadoSubastaReplicado estadoSubasta) {
+        this(tipo, idEmisor);
+        this.estadoSubasta = estadoSubasta;
     }
 
     // Getters y Setters
@@ -100,6 +110,14 @@ public class MensajeBully implements Serializable {
 
     public long getTimestamp() {
         return timestamp;
+    }
+
+    public EstadoSubastaReplicado getEstadoSubasta() {
+        return estadoSubasta;
+    }
+
+    public void setEstadoSubasta(EstadoSubastaReplicado estadoSubasta) {
+        this.estadoSubasta = estadoSubasta;
     }
 
     @Override

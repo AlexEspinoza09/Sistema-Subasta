@@ -20,6 +20,9 @@ public class ClienteSubastaAuxiliar {
     private volatile String ultimaActualizacion = "";
     private volatile String ultimaRespuestaPropuesta = null;
     private final Object lockRespuesta = new Object();
+    private String hostActual;
+    private int puertoActual;
+    private static final int MAX_REINTENTOS_RECONEXION = 3;
 
     /**
      * Constructor que establece la conexión con el servidor
@@ -29,9 +32,11 @@ public class ClienteSubastaAuxiliar {
 
         this.maquinaServidora = InetAddress.getByName(nombreMaquina);
         this.puertoServidor = Integer.parseInt(numPuerto);
+        this.hostActual = nombreMaquina;
+        this.puertoActual = this.puertoServidor;
 
         // Conectar al servidor (con manejo de redirección)
-        conectarConRedireccion(nombreMaquina, this.puertoServidor);
+        conectarConRedireccion(this.hostActual, this.puertoActual);
 
         // Iniciar hilo de escucha para recibir actualizaciones periódicas
         iniciarHiloEscucha();
@@ -85,6 +90,8 @@ public class ClienteSubastaAuxiliar {
                     // Poner el mensaje de vuelta en la cola si es necesario
                     // (en este caso, el hilo de escucha lo manejará)
                     this.miSocket.getSocket().setSoTimeout(0);
+                    this.hostActual = host;
+                    this.puertoActual = puerto;
                     System.out.println("[CONECTADO] Servidor de subasta activo");
                     return;
                 }
@@ -92,12 +99,62 @@ public class ClienteSubastaAuxiliar {
             } catch (SocketTimeoutException e) {
                 // No hubo redirección, conexión exitosa
                 this.miSocket.getSocket().setSoTimeout(0);
+                this.hostActual = host;
+                this.puertoActual = puerto;
                 System.out.println("[CONECTADO] Servidor de subasta activo");
                 return;
             }
         }
 
         throw new IOException("Máximo de redirecciones alcanzado (" + MAX_REDIRECCIONES + ")");
+    }
+
+    /**
+     * Intenta reconectar al sistema después de perder conexión
+     * @return true si la reconexión fue exitosa
+     */
+    private boolean intentarReconectar() {
+        System.out.println("\n[RECONEXION] Intentando reconectar al sistema...");
+
+        for (int intento = 1; intento <= MAX_REINTENTOS_RECONEXION; intento++) {
+            try {
+                System.out.println("[RECONEXION] Intento " + intento + "/" + MAX_REINTENTOS_RECONEXION);
+
+                // Esperar un momento antes de reintentar
+                Thread.sleep(2000 * intento); // Backoff exponencial
+
+                // Intentar reconectar al último servidor conocido
+                // Puede ser redirigido automáticamente al nuevo coordinador
+                conectarConRedireccion(hostActual, puertoActual);
+
+                System.out.println("[RECONEXION] Reconexión exitosa!");
+
+                // Reenviar última propuesta si existe
+                if (miUltimaPropuesta > 0) {
+                    System.out.println("[RECONEXION] Reenviando última propuesta: $" + miUltimaPropuesta);
+                    try {
+                        miSocket.enviaMensaje(String.valueOf(miUltimaPropuesta));
+                    } catch (IOException e) {
+                        System.out.println("[RECONEXION] Error al reenviar propuesta: " + e.getMessage());
+                    }
+                }
+
+                // Reiniciar hilo de escucha
+                iniciarHiloEscucha();
+
+                return true;
+
+            } catch (Exception e) {
+                System.out.println("[RECONEXION] Fallo intento " + intento + ": " + e.getMessage());
+                if (intento < MAX_REINTENTOS_RECONEXION) {
+                    System.out.println("[RECONEXION] Reintentando...");
+                }
+            }
+        }
+
+        System.out.println("[RECONEXION] No se pudo reconectar después de " +
+                         MAX_REINTENTOS_RECONEXION + " intentos");
+        return false;
     }
 
     /**
@@ -253,7 +310,19 @@ public class ClienteSubastaAuxiliar {
                     String mensaje = miSocket.recibeMensaje();
 
                     if (mensaje == null) {
-                        System.out.println("\n[INFO] Conexion cerrada por el servidor");
+                        System.out.println("\n[DESCONEXION] Conexión cerrada por el servidor");
+
+                        // Intentar reconectar automáticamente
+                        if (subastaActiva && escuchando) {
+                            if (!intentarReconectar()) {
+                                // Si no se pudo reconectar, terminar
+                                subastaActiva = false;
+                                escuchando = false;
+                                System.out.println("[ERROR] No se pudo restablecer la conexión. Cliente desconectado.");
+                            }
+                            // Si la reconexión fue exitosa, el nuevo hilo de escucha continuará
+                            return;
+                        }
                         break;
                     }
 

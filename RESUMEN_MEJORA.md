@@ -324,6 +324,172 @@ docker logs subasta-bully-nodo-1 --tail 20
 
 ---
 
+## 🔨 Corrección de Bug #2 - Nodo No Se Convierte en Coordinador al Reiniciar
+
+### Problema Detectado
+
+**Síntoma:** Cuando el Nodo 3 (coordinador) caía y luego se reiniciaba, intentaba convertirse en coordinador pero inmediatamente volvía a estado de participante.
+
+**Logs observados:**
+```
+[BULLY] Nuevo coordinador: Nodo 3
+[BULLY] Iniciando nueva elección...  (inmediatamente después)
+```
+
+**Causa raíz identificada:** Cuando un nodo se reiniciaba y anunciaba que era coordinador:
+1. Los otros nodos recibían el mensaje COORDINATOR
+2. Actualizaban `idCoordinadorActual = 3`
+3. **PERO no marcaban al Nodo 3 como activo** en su mapa de nodos
+4. El monitor de heartbeats verificaba si el coordinador estaba vivo usando `coordinador.estaVivo()`
+5. Como `estaVivo()` requiere `activo == true AND heartbeat reciente`, fallaba
+6. Disparaba inmediatamente una nueva elección
+
+**Código problemático en `estaVivo()`:**
+```java
+public boolean estaVivo(long timeout) {
+    long ahora = System.currentTimeMillis();
+    return activo && (ahora - ultimoLatido) < timeout;  // activo era false
+}
+```
+
+### Solución Aplicada
+
+Se modificaron tres métodos en `servidor/GestorEleccion.java` para marcar nodos como activos cuando envían mensajes:
+
+#### 1. `manejarCoordinator()` (línea 300)
+```java
+private void manejarCoordinator(MensajeBully mensaje) {
+    int idNuevoCoord = mensaje.getIdEmisor();
+
+    // Si el nuevo coordinador tiene ID menor que yo, rechazar e iniciar elección
+    if (idNuevoCoord < nodoLocal.getId()) {
+        System.out.println("[BULLY] Rechazado coordinador " + idNuevoCoord +
+                         " (ID menor que " + nodoLocal.getId() + "). Iniciando elección...");
+        poolHilos.submit(() -> iniciarEleccion());
+        return;
+    }
+
+    System.out.println("[BULLY] Nuevo coordinador: Nodo " + idNuevoCoord);
+    idCoordinadorActual = idNuevoCoord;
+
+    // Marcar al nuevo coordinador como activo
+    NodoSubasta nodoCoordinador = nodos.get(idNuevoCoord);
+    if (nodoCoordinador != null) {
+        nodoCoordinador.setActivo(true);  // ← NUEVO
+        nodoCoordinador.actualizarLatido();
+        System.out.println("[BULLY] Nodo " + idNuevoCoord + " marcado como activo");
+    }
+
+    synchronized(lockEleccion) {
+        enEleccion = false;
+    }
+}
+```
+
+**Mejoras:**
+- Marca al coordinador como activo cuando se recibe mensaje COORDINATOR
+- Valida que el nuevo coordinador tiene ID mayor que el nodo local
+- Rechaza coordinadores con ID menor e inicia elección defensiva
+
+#### 2. `manejarHeartbeat()` (línea 317)
+```java
+private void manejarHeartbeat(MensajeBully mensaje) {
+    int idEmisor = mensaje.getIdEmisor();
+    NodoSubasta nodo = nodos.get(idEmisor);
+
+    if (nodo != null) {
+        // Marcar nodo como activo si envía heartbeat
+        nodo.setActivo(true);  // ← NUEVO
+        nodo.actualizarLatido();
+    }
+
+    if (idEmisor == idCoordinadorActual) {
+        if (nodo != null) {
+            nodo.setActivo(true);  // ← NUEVO
+            nodo.actualizarLatido();
+        }
+    }
+}
+```
+
+**Mejoras:**
+- Marca cualquier nodo que envíe heartbeat como activo
+- Esto permite que nodos reiniciados sean reconocidos como vivos
+
+#### 3. `manejarElection()` (línea 275)
+```java
+private void manejarElection(MensajeBully mensaje, Socket socketOrigen) throws IOException {
+    System.out.println("[BULLY] Recibido ELECTION de nodo " + mensaje.getIdEmisor());
+
+    // Marcar al nodo emisor como activo (si envía ELECTION, está vivo)
+    NodoSubasta nodoEmisor = nodos.get(mensaje.getIdEmisor());
+    if (nodoEmisor != null) {
+        nodoEmisor.setActivo(true);  // ← NUEVO
+        nodoEmisor.actualizarLatido();
+    }
+
+    // Responder con OK
+    MensajeBully respuesta = new MensajeBully(MensajeBully.TipoMensaje.OK, nodoLocal.getId());
+    ObjectOutputStream out = new ObjectOutputStream(socketOrigen.getOutputStream());
+    out.writeObject(respuesta);
+    out.flush();
+
+    System.out.println("[BULLY] Enviado OK a nodo " + mensaje.getIdEmisor());
+
+    // Iniciar mi propia elección (tengo mayor ID)
+    poolHilos.submit(() -> iniciarEleccion());
+}
+```
+
+**Mejoras:**
+- Marca al nodo emisor como activo cuando recibe mensaje ELECTION
+- Permite reconocer nodos reiniciados que inician elecciones
+
+### Verificación de la Corrección
+
+**Escenario de prueba completo:**
+
+1. **Estado inicial:** Nodo 3 es coordinador
+2. **Paso 1:** Detener Nodo 3
+   - Resultado: Nodo 2 se convierte en coordinador ✓
+3. **Paso 2:** Reiniciar Nodo 3
+   - Nodo 3 inicia y anuncia que es coordinador
+   - Nodos 1 y 2 reciben mensaje COORDINATOR
+4. **Paso 3:** Verificar reconocimiento
+   ```
+   [BULLY] Nuevo coordinador: Nodo 3
+   [BULLY] Nodo 3 marcado como activo  ← Nuevo log
+   [BULLY] Mensaje recibido: MensajeBully{tipo=HEARTBEAT, idEmisor=3...}
+   ```
+5. **Paso 4:** Esperar 15+ segundos
+   - Resultado: Nodo 3 permanece como coordinador ✓
+   - No se disparan nuevas elecciones ✓
+
+**Resultados:**
+
+✅ **Reconocimiento exitoso:** Nodos marcan a Nodo 3 como activo
+✅ **Validación de ID:** Rechaza coordinadores con ID menor
+✅ **Persistencia:** Nodo 3 se mantiene como coordinador
+✅ **Heartbeats:** Flujo normal de heartbeats entre nodos
+✅ **Sin elecciones espurias:** No hay elecciones innecesarias después del reinicio
+
+### Archivos Modificados
+- `servidor/GestorEleccion.java`:
+  - Método `manejarCoordinator()` (línea 300)
+  - Método `manejarHeartbeat()` (línea 317)
+  - Método `manejarElection()` (línea 275)
+
+### Principio de Diseño
+
+**Lección aprendida:** En sistemas distribuidos, cualquier nodo que envíe mensajes debe ser considerado activo. El flag `activo` debe actualizarse dinámicamente basándose en la comunicación recibida, no solo en timeouts.
+
+**Regla implementada:** "Si un nodo se comunica, está vivo"
+- Mensaje COORDINATOR → marcar emisor como activo
+- Mensaje HEARTBEAT → marcar emisor como activo
+- Mensaje ELECTION → marcar emisor como activo
+
+---
+
 **Autor**: Sistema de Subasta Distribuido
 **Fecha Inicial**: 2025-12-02
 **Última Actualización**: 2025-12-10

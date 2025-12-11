@@ -25,6 +25,9 @@ public class GestorEleccion {
     private ScheduledExecutorService scheduledPool;
     private volatile boolean activo;
 
+    // Estado replicado de la subasta
+    private EstadoSubastaReplicado estadoSubasta;
+
     /**
      * Constructor
      */
@@ -33,6 +36,7 @@ public class GestorEleccion {
         this.nodos = new ConcurrentHashMap<>();
         this.enEleccion = false;
         this.activo = true;
+        this.estadoSubasta = new EstadoSubastaReplicado(); // Inicializar estado replicado
 
         // Agregar todos los nodos
         for (NodoSubasta nodo : todosLosNodos) {
@@ -43,6 +47,7 @@ public class GestorEleccion {
         this.scheduledPool = Executors.newScheduledThreadPool(3);
 
         System.out.println("[BULLY] Gestor de elección iniciado para nodo " + nodoLocal.getId());
+        System.out.println("[BULLY] Estado replicado inicializado");
 
         // Iniciar monitoreo de heartbeats del coordinador
         iniciarMonitoreoCoordinador();
@@ -260,6 +265,10 @@ public class GestorEleccion {
                     manejarHeartbeat(mensaje);
                     break;
 
+                case SYNC_ESTADO:
+                    manejarSyncEstado(mensaje);
+                    break;
+
                 default:
                     System.out.println("[BULLY] Tipo de mensaje desconocido: " + mensaje.getTipo());
             }
@@ -274,6 +283,13 @@ public class GestorEleccion {
      */
     private void manejarElection(MensajeBully mensaje, Socket socketOrigen) throws IOException {
         System.out.println("[BULLY] Recibido ELECTION de nodo " + mensaje.getIdEmisor());
+
+        // Marcar al nodo emisor como activo (si envía ELECTION, está vivo)
+        NodoSubasta nodoEmisor = nodos.get(mensaje.getIdEmisor());
+        if (nodoEmisor != null) {
+            nodoEmisor.setActivo(true);
+            nodoEmisor.actualizarLatido();
+        }
 
         // Responder con OK
         MensajeBully respuesta = new MensajeBully(MensajeBully.TipoMensaje.OK, nodoLocal.getId());
@@ -291,12 +307,30 @@ public class GestorEleccion {
      * Maneja mensaje COORDINATOR
      */
     private void manejarCoordinator(MensajeBully mensaje) {
+        int idNuevoCoord = mensaje.getIdEmisor();
+
+        // Si el nuevo coordinador tiene ID menor que yo, rechazar e iniciar elección
+        if (idNuevoCoord < nodoLocal.getId()) {
+            System.out.println("[BULLY] Rechazado coordinador " + idNuevoCoord +
+                             " (ID menor que " + nodoLocal.getId() + "). Iniciando elección...");
+            poolHilos.submit(() -> iniciarEleccion());
+            return;
+        }
+
         System.out.println("\n===========================================");
         System.out.println("  COORDINADOR ACTUALIZADO");
         System.out.println("===========================================");
-        System.out.println("[BULLY] Nuevo coordinador: Nodo " + mensaje.getIdEmisor());
+        System.out.println("[BULLY] Nuevo coordinador: Nodo " + idNuevoCoord);
 
-        idCoordinadorActual = mensaje.getIdEmisor();
+        idCoordinadorActual = idNuevoCoord;
+
+        // Marcar al nuevo coordinador como activo
+        NodoSubasta nodoCoordinador = nodos.get(idNuevoCoord);
+        if (nodoCoordinador != null) {
+            nodoCoordinador.setActivo(true);
+            nodoCoordinador.actualizarLatido();
+            System.out.println("[BULLY] Nodo " + idNuevoCoord + " marcado como activo");
+        }
 
         synchronized(lockEleccion) {
             enEleccion = false;
@@ -311,6 +345,8 @@ public class GestorEleccion {
         NodoSubasta nodo = nodos.get(idEmisor);
 
         if (nodo != null) {
+            // Marcar nodo como activo si envía heartbeat
+            nodo.setActivo(true);
             nodo.actualizarLatido();
         }
 
@@ -318,6 +354,7 @@ public class GestorEleccion {
         if (idEmisor == idCoordinadorActual) {
             // Coordinador está vivo, actualizar su nodo
             if (nodo != null) {
+                nodo.setActivo(true);
                 nodo.actualizarLatido();
             }
         }
@@ -424,6 +461,66 @@ public class GestorEleccion {
             nodo.setActivo(false);
             throw e;
         }
+    }
+
+    /**
+     * Maneja mensaje SYNC_ESTADO recibido de un nodo
+     */
+    private void manejarSyncEstado(MensajeBully mensaje) {
+        EstadoSubastaReplicado estadoRecibido = mensaje.getEstadoSubasta();
+
+        if (estadoRecibido != null) {
+            estadoSubasta.sincronizarCon(estadoRecibido);
+            System.out.println("[SYNC] Estado sincronizado desde nodo " + mensaje.getIdEmisor());
+            System.out.println("[SYNC] " + estadoSubasta);
+        }
+    }
+
+    /**
+     * Replica el estado actual a todos los nodos participantes
+     * Solo debe ser llamado por el coordinador
+     */
+    public void replicarEstado() {
+        if (!esCoordinador()) {
+            return; // Solo el coordinador replica estado
+        }
+
+        MensajeBully mensaje = new MensajeBully(
+            MensajeBully.TipoMensaje.SYNC_ESTADO,
+            nodoLocal.getId(),
+            estadoSubasta.clonar() // Enviar copia del estado
+        );
+
+        for (NodoSubasta nodo : nodos.values()) {
+            if (nodo.getId() != nodoLocal.getId() && nodo.isActivo()) {
+                poolHilos.submit(() -> {
+                    try {
+                        enviarMensaje(nodo, mensaje);
+                        System.out.println("[SYNC] Estado replicado a nodo " + nodo.getId());
+                    } catch (Exception e) {
+                        System.out.println("[SYNC] Error al replicar a nodo " + nodo.getId());
+                    }
+                });
+            }
+        }
+    }
+
+    /**
+     * Registra una oferta en el estado y la replica a todos los nodos
+     * Solo debe ser llamado por el coordinador
+     */
+    public void registrarOferta(String ip, double monto) {
+        estadoSubasta.agregarOferta(ip, monto);
+
+        // Replicar inmediatamente a todos los nodos
+        replicarEstado();
+    }
+
+    /**
+     * Obtiene el estado replicado de la subasta
+     */
+    public EstadoSubastaReplicado getEstadoSubasta() {
+        return estadoSubasta;
     }
 
     // Getters
