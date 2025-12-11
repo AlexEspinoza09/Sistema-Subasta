@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(javac:*)",
+      "Bash(bash:*)",
+      "Bash(find:*)",
+      "Bash(docker logs:*)",
+      "Bash(docker-compose:*)",
+      "Bash(docker stop:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

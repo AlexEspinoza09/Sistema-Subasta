@@ -329,30 +329,44 @@ public class GestorEleccion {
      */
     public void iniciarMonitoreoCoordinador() {
         scheduledPool.scheduleAtFixedRate(() -> {
-            if (!activo) return;
+            try {
+                if (!activo) return;
 
-            // Si no soy coordinador, verificar que el coordinador esté vivo
-            if (idCoordinadorActual != null && !idCoordinadorActual.equals(nodoLocal.getId())) {
-                NodoSubasta coordinador = nodos.get(idCoordinadorActual);
+                // Si no soy coordinador, verificar que el coordinador esté vivo
+                if (idCoordinadorActual != null && !idCoordinadorActual.equals(nodoLocal.getId())) {
+                    NodoSubasta coordinador = nodos.get(idCoordinadorActual);
 
-                if (coordinador != null && !coordinador.estaVivo(TIMEOUT_HEARTBEAT)) {
-                    System.out.println("\n[BULLY] !!! COORDINADOR CAIDO !!!");
-                    System.out.println("[BULLY] Ultimo heartbeat: " +
-                                     (System.currentTimeMillis() - coordinador.getUltimoLatido()) + " ms atrás");
-                    System.out.println("[BULLY] Iniciando nueva elección...");
+                    if (coordinador != null && !coordinador.estaVivo(TIMEOUT_HEARTBEAT)) {
+                        long tiempoSinHeartbeat = System.currentTimeMillis() - coordinador.getUltimoLatido();
 
-                    // Marcar coordinador como inactivo
-                    coordinador.setActivo(false);
-                    idCoordinadorActual = null;
+                        System.out.println("\n[BULLY] !!! COORDINADOR CAIDO !!!");
+                        System.out.println("[BULLY] Coordinador ID: " + idCoordinadorActual);
+                        System.out.println("[BULLY] Ultimo heartbeat: " + tiempoSinHeartbeat + " ms atrás");
+                        System.out.println("[BULLY] Iniciando nueva elección...");
 
-                    // Iniciar elección
-                    poolHilos.submit(() -> iniciarEleccion());
+                        // Marcar SOLO el coordinador caído como inactivo
+                        coordinador.setActivo(false);
+
+                        // Limpiar ID del coordinador
+                        Integer coordinadorCaido = idCoordinadorActual;
+                        idCoordinadorActual = null;
+
+                        // Iniciar elección UNA SOLA VEZ
+                        // Usar un flag para evitar múltiples elecciones simultáneas
+                        synchronized(lockEleccion) {
+                            if (!enEleccion) {
+                                poolHilos.submit(() -> iniciarEleccion());
+                            }
+                        }
+                    }
                 }
+            } catch (Exception e) {
+                System.out.println("[BULLY] Error en monitor de heartbeats: " + e.getMessage());
             }
-        }, TIMEOUT_HEARTBEAT, TIMEOUT_HEARTBEAT / 2, TimeUnit.MILLISECONDS);
+        }, TIMEOUT_HEARTBEAT, TIMEOUT_HEARTBEAT, TimeUnit.MILLISECONDS);
 
         System.out.println("[BULLY] Monitor de heartbeats iniciado (verificación cada " +
-                         (TIMEOUT_HEARTBEAT/2000) + " segundos)");
+                         (TIMEOUT_HEARTBEAT/1000) + " segundos)");
     }
 
     /**
