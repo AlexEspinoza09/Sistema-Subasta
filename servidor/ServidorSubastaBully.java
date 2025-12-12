@@ -543,9 +543,16 @@ public class ServidorSubastaBully {
                              (ganadorAnterior != null ? ganadorAnterior.getKey() + " -> $" + ganadorAnterior.getValue() : "ninguno"));
 
             // Registrar oferta en el estado replicado
-            // El gestor de elección se encargará de replicar a todos los nodos
+            // El gestor de elección se encargará de replicar a todos los nodos si es aceptada
+            boolean ofertaAceptada = false;
             if (gestorEleccion.esCoordinador()) {
-                gestorEleccion.registrarOferta(ip, nuevaPropuesta);
+                ofertaAceptada = gestorEleccion.registrarOferta(ip, nuevaPropuesta);
+            }
+
+            // Si la oferta fue rechazada, no continuar
+            if (!ofertaAceptada) {
+                System.out.println("[OFERTA RECHAZADA] Cliente intentó bajar su oferta");
+                return false;
             }
 
             // Obtener la oferta ganadora DESPUES de agregar
@@ -555,14 +562,8 @@ public class ServidorSubastaBully {
 
             // Verificar si la nueva propuesta es la más alta
             if (ganadorActual != null && ganadorActual.getKey().equals(ip)) {
-                // Solo es "nueva alta" si el monto es mayor que el anterior
-                if (nuevaPropuesta > montoAnterior) {
-                    System.out.println("[NUEVA ALTA] $" + nuevaPropuesta + " de " + ip);
-                    return true;
-                } else {
-                    System.out.println("[MISMA ALTA] $" + nuevaPropuesta + " de " + ip + " (ya era el ganador)");
-                    return true; // Sigue siendo el ganador
-                }
+                System.out.println("[NUEVA ALTA] $" + nuevaPropuesta + " de " + ip + " es la oferta ganadora");
+                return true;
             } else {
                 System.out.println("[NO ES ALTA] $" + nuevaPropuesta + " de " + ip + " (perdiendo contra $" +
                                  (ganadorActual != null ? ganadorActual.getValue() : 0) + ")");
@@ -581,6 +582,13 @@ public class ServidorSubastaBully {
                 return "PROPUESTA_ALTA:ninguno:0.0";
             }
             return "PROPUESTA_ALTA:" + ganador.getKey() + ":" + ganador.getValue();
+        }
+    }
+
+    public Double obtenerOfertaCliente(String clienteId) {
+        synchronized(lockSubasta) {
+            EstadoSubastaReplicado estado = gestorEleccion.getEstadoSubasta();
+            return estado.getOferta(clienteId);
         }
     }
 

@@ -520,12 +520,17 @@ public class GestorEleccion {
     /**
      * Registra una oferta en el estado y la replica a todos los nodos
      * Solo debe ser llamado por el coordinador
+     * @return true si la oferta fue aceptada, false si fue rechazada
      */
-    public void registrarOferta(String ip, double monto) {
-        estadoSubasta.agregarOferta(ip, monto);
+    public boolean registrarOferta(String ip, double monto) {
+        boolean aceptada = estadoSubasta.agregarOferta(ip, monto);
 
-        // Replicar inmediatamente a todos los nodos
-        replicarEstado();
+        // Solo replicar si la oferta fue aceptada
+        if (aceptada) {
+            replicarEstado();
+        }
+
+        return aceptada;
     }
 
     /**

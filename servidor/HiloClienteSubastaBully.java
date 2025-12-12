@@ -57,13 +57,28 @@ public class HiloClienteSubastaBully implements Runnable {
                         continue;
                     }
 
+                    // Verificar si el cliente ya tiene una oferta anterior
+                    Double ofertaAnterior = servidor.obtenerOfertaCliente(clienteId);
+
                     // Actualizar la propuesta del cliente
-                    propuesta = nuevaPropuesta;
-                    System.out.println("Cliente " + clienteId + " ofrece: $" + propuesta);
+                    System.out.println("Cliente " + clienteId + " ofrece: $" + nuevaPropuesta);
 
                     // Actualizar la propuesta mas alta del servidor
                     boolean esLaMasAlta = servidor.actualizarPropuestaMasAlta(
                         nuevaPropuesta, clienteId);
+
+                    // Verificar si la oferta fue rechazada por ser menor o igual a la anterior
+                    Double ofertaActual = servidor.obtenerOfertaCliente(clienteId);
+                    if (ofertaAnterior != null && ofertaActual != null &&
+                        ofertaActual.equals(ofertaAnterior) && nuevaPropuesta <= ofertaAnterior) {
+                        // La oferta fue rechazada
+                        miSocket.enviaMensaje("ERROR:Tu nueva oferta ($" + nuevaPropuesta +
+                                            ") debe ser mayor que tu oferta anterior ($" + ofertaAnterior + ")");
+                        continue;
+                    }
+
+                    // Actualizar propuesta local solo si fue aceptada
+                    propuesta = nuevaPropuesta;
 
                     // Enviar respuesta con la propuesta mas alta actual y tiempo restante
                     String respuesta = "RESPUESTA:" + servidor.obtenerPropuestaMasAlta() +

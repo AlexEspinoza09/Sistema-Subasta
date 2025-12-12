@@ -30,8 +30,9 @@ public class EstadoSubastaReplicado implements Serializable {
      * Agrega o actualiza una oferta
      * @param clienteId ID único del cliente (IP:Puerto)
      * @param monto Monto de la oferta
+     * @return true si la oferta fue aceptada, false si fue rechazada por ser menor o igual a la anterior
      */
-    public synchronized void agregarOferta(String clienteId, double monto) {
+    public synchronized boolean agregarOferta(String clienteId, double monto) {
         // Log estado antes de agregar
         System.out.println("[ESTADO] ANTES de agregar - Total ofertas: " + ofertas.size());
         if (!ofertas.isEmpty()) {
@@ -41,10 +42,21 @@ public class EstadoSubastaReplicado implements Serializable {
             }
         }
 
+        // Verificar si el cliente ya tiene una oferta
+        Double ofertaAnterior = ofertas.get(clienteId);
+        if (ofertaAnterior != null && monto <= ofertaAnterior) {
+            System.out.println("[ESTADO] ✗ Oferta RECHAZADA: " + clienteId + " -> $" + monto +
+                             " (oferta anterior: $" + ofertaAnterior + ")");
+            return false;
+        }
+
         ofertas.put(clienteId, monto);
         timestampUltimaActualizacion = System.currentTimeMillis();
 
-        System.out.println("[ESTADO] Oferta registrada: " + clienteId + " -> $" + monto);
+        System.out.println("[ESTADO] ✓ Oferta ACEPTADA: " + clienteId + " -> $" + monto);
+        if (ofertaAnterior != null) {
+            System.out.println("[ESTADO]   (mejoró su oferta anterior de $" + ofertaAnterior + ")");
+        }
         System.out.println("[ESTADO] DESPUÉS de agregar - Total de ofertas: " + ofertas.size());
 
         // Mostrar ganador actual
@@ -52,6 +64,8 @@ public class EstadoSubastaReplicado implements Serializable {
         if (ganador != null) {
             System.out.println("[ESTADO] Ganador actual: " + ganador.getKey() + " -> $" + ganador.getValue());
         }
+
+        return true;
     }
 
     /**
