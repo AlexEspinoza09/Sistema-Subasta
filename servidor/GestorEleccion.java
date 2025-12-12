@@ -158,6 +158,14 @@ public class GestorEleccion {
         System.out.println("  NUEVO COORDINADOR: Nodo " + nodoLocal.getId());
         System.out.println("===========================================");
 
+        // Si mi estado está vacío, solicitar estado de otros nodos
+        if (!estadoSubasta.tieneOfertas()) {
+            System.out.println("[SYNC] Estado local vacío. Solicitando estado de otros nodos...");
+            solicitarEstadoDeNodos();
+        } else {
+            System.out.println("[SYNC] Estado local tiene " + estadoSubasta.getCantidadOfertas() + " ofertas");
+        }
+
         // Anunciar a todos los demas nodos
         anunciarCoordinador();
 
@@ -267,6 +275,10 @@ public class GestorEleccion {
 
                 case SYNC_ESTADO:
                     manejarSyncEstado(mensaje);
+                    break;
+
+                case REQUEST_ESTADO:
+                    manejarRequestEstado(mensaje, socketOrigen);
                     break;
 
                 default:
@@ -514,6 +526,89 @@ public class GestorEleccion {
 
         // Replicar inmediatamente a todos los nodos
         replicarEstado();
+    }
+
+    /**
+     * Maneja solicitud de estado de otro nodo
+     */
+    private void manejarRequestEstado(MensajeBully mensaje, Socket socketOrigen) throws IOException {
+        System.out.println("[SYNC] Nodo " + mensaje.getIdEmisor() + " solicita estado");
+
+        // Enviar mi estado actual
+        MensajeBully respuesta = new MensajeBully(
+            MensajeBully.TipoMensaje.SYNC_ESTADO,
+            nodoLocal.getId(),
+            estadoSubasta.clonar()
+        );
+
+        ObjectOutputStream out = new ObjectOutputStream(socketOrigen.getOutputStream());
+        out.writeObject(respuesta);
+        out.flush();
+
+        System.out.println("[SYNC] Estado enviado a nodo " + mensaje.getIdEmisor() +
+                         " (" + estadoSubasta.getCantidadOfertas() + " ofertas)");
+    }
+
+    /**
+     * Solicita el estado a todos los nodos activos
+     * Se usa cuando este nodo se convierte en coordinador con estado vacío
+     */
+    private void solicitarEstadoDeNodos() {
+        System.out.println("[SYNC] Solicitando estado a todos los nodos activos...");
+
+        EstadoSubastaReplicado estadoMasReciente = null;
+        long timestampMasReciente = 0;
+
+        for (NodoSubasta nodo : nodos.values()) {
+            if (nodo.getId() == nodoLocal.getId()) continue;
+            if (!nodo.isActivo()) continue;
+
+            try {
+                System.out.println("[SYNC] Solicitando estado a nodo " + nodo.getId());
+
+                MensajeBully solicitud = new MensajeBully(
+                    MensajeBully.TipoMensaje.REQUEST_ESTADO,
+                    nodoLocal.getId()
+                );
+
+                MensajeBully respuesta = enviarYEsperarRespuesta(nodo, solicitud, 3000);
+
+                if (respuesta != null && respuesta.getTipo() == MensajeBully.TipoMensaje.SYNC_ESTADO) {
+                    EstadoSubastaReplicado estadoRecibido = respuesta.getEstadoSubasta();
+
+                    if (estadoRecibido != null) {
+                        System.out.println("[SYNC] Estado recibido de nodo " + nodo.getId() +
+                                         " (" + estadoRecibido.getCantidadOfertas() + " ofertas, " +
+                                         "timestamp: " + estadoRecibido.getTimestampUltimaActualizacion() + ")");
+
+                        // Tomar el estado con el timestamp más reciente
+                        if (estadoRecibido.getTimestampUltimaActualizacion() > timestampMasReciente) {
+                            estadoMasReciente = estadoRecibido;
+                            timestampMasReciente = estadoRecibido.getTimestampUltimaActualizacion();
+                        }
+                    }
+                } else {
+                    System.out.println("[SYNC] Nodo " + nodo.getId() + " no respondió o no tiene estado");
+                }
+
+            } catch (Exception e) {
+                System.out.println("[SYNC] Error al solicitar estado de nodo " + nodo.getId() + ": " + e.getMessage());
+            }
+        }
+
+        // Si encontramos un estado, usarlo
+        if (estadoMasReciente != null && estadoMasReciente.tieneOfertas()) {
+            estadoSubasta.sincronizarCon(estadoMasReciente);
+            System.out.println("[SYNC] ✓ Estado recuperado exitosamente!");
+            System.out.println("[SYNC] Total ofertas recuperadas: " + estadoSubasta.getCantidadOfertas());
+
+            Map.Entry<String, Double> ganador = estadoSubasta.getOfertaGanadora();
+            if (ganador != null) {
+                System.out.println("[SYNC] Oferta ganadora: " + ganador.getKey() + " -> $" + ganador.getValue());
+            }
+        } else {
+            System.out.println("[SYNC] No se encontró estado en otros nodos (subasta nueva)");
+        }
     }
 
     /**

@@ -12,6 +12,7 @@ import java.util.concurrent.CountDownLatch;
 public class HiloClienteSubastaBully implements Runnable {
     private MiSocketStream miSocket;
     private String ipCliente;
+    private String clienteId; // ID único: IP:Puerto
     private double propuesta;
     private volatile boolean resultadoEnviado = false;
     private CountDownLatch latch = new CountDownLatch(1);
@@ -20,8 +21,12 @@ public class HiloClienteSubastaBully implements Runnable {
     public HiloClienteSubastaBully(MiSocketStream socket, String ip, ServidorSubastaBully servidor) {
         this.miSocket = socket;
         this.ipCliente = ip;
+        // Generar ID único usando IP:Puerto del socket remoto
+        int puertoRemoto = socket.getSocket().getPort();
+        this.clienteId = ip + ":" + puertoRemoto;
         this.propuesta = 0.0;
         this.servidor = servidor;
+        System.out.println("[CLIENTE] ID único generado: " + this.clienteId);
     }
 
     @Override
@@ -54,11 +59,11 @@ public class HiloClienteSubastaBully implements Runnable {
 
                     // Actualizar la propuesta del cliente
                     propuesta = nuevaPropuesta;
-                    System.out.println("Cliente " + ipCliente + " ofrece: $" + propuesta);
+                    System.out.println("Cliente " + clienteId + " ofrece: $" + propuesta);
 
                     // Actualizar la propuesta mas alta del servidor
                     boolean esLaMasAlta = servidor.actualizarPropuestaMasAlta(
-                        nuevaPropuesta, ipCliente);
+                        nuevaPropuesta, clienteId);
 
                     // Enviar respuesta con la propuesta mas alta actual y tiempo restante
                     String respuesta = "RESPUESTA:" + servidor.obtenerPropuestaMasAlta() +
@@ -147,5 +152,9 @@ public class HiloClienteSubastaBully implements Runnable {
 
     public String getIpCliente() {
         return ipCliente;
+    }
+
+    public String getClienteId() {
+        return clienteId;
     }
 }

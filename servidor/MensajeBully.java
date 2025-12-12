@@ -19,7 +19,8 @@ public class MensajeBully implements Serializable {
         PING,          // Solicitud de estado
         ESTADO,        // Respuesta con información del nodo
         REDIRECCION,   // Redirigir cliente al coordinador
-        SYNC_ESTADO    // Sincronización del estado de la subasta
+        SYNC_ESTADO,   // Sincronización del estado de la subasta
+        REQUEST_ESTADO // Solicitud de estado de subasta
     }
 
     private TipoMensaje tipo;

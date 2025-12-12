@@ -228,15 +228,16 @@ public class ClienteSubastaAuxiliar {
                 respuesta = respuesta.substring(10); // Remover "RESPUESTA:"
             }
 
-            // Formato: PROPUESTA_ALTA:ip:monto:TIEMPO:segundos:TU_PROPUESTA:estado
+            // Formato: PROPUESTA_ALTA:ip:port:monto:TIEMPO:segundos:TU_PROPUESTA:estado
             String[] partes = respuesta.split(":");
 
-            String ipMasAlta = partes[1];
-            double montoMasAlto = Double.parseDouble(partes[2]);
-            long tiempoRestante = Long.parseLong(partes[4]);
-            boolean estoyGanando = partes[6].equals("GANANDO");
+            // Cliente ID ahora incluye IP:Puerto
+            String clienteId = partes[1] + ":" + partes[2];
+            double montoMasAlto = Double.parseDouble(partes[3]);
+            long tiempoRestante = Long.parseLong(partes[5]);
+            boolean estoyGanando = partes[7].equals("GANANDO");
 
-            return new EstadoSubasta(true, "", ipMasAlta, montoMasAlto,
+            return new EstadoSubasta(true, "", clienteId, montoMasAlto,
                                     tiempoRestante, estoyGanando);
 
         } catch (Exception e) {
@@ -250,14 +251,14 @@ public class ClienteSubastaAuxiliar {
      */
     private String formatearResultadoFinal(String resultado) {
         try {
-            // Formato: "GANADOR:IP:MONTO:cantidad"
+            // Formato: "GANADOR:IP:PORT:MONTO:cantidad"
             String[] partes = resultado.split(":");
-            if (partes.length >= 4) {
-                String ipGanador = partes[1];
-                double montoGanador = Double.parseDouble(partes[3]);
+            if (partes.length >= 5) {
+                String clienteIdGanador = partes[1] + ":" + partes[2];
+                double montoGanador = Double.parseDouble(partes[4]);
 
                 StringBuilder sb = new StringBuilder();
-                sb.append("\n  Ganador: ").append(ipGanador).append("\n");
+                sb.append("\n  Ganador: ").append(clienteIdGanador).append("\n");
                 sb.append("  Monto ganador: $").append(montoGanador).append("\n");
                 sb.append("  Tu ultima propuesta: $").append(miUltimaPropuesta).append("\n\n");
 
@@ -384,15 +385,15 @@ public class ClienteSubastaAuxiliar {
      */
     private void procesarActualizacion(String update) {
         try {
-            // Formato: PROPUESTA_ALTA:ip:monto:TIEMPO:segundos
+            // Formato: PROPUESTA_ALTA:ip:port:monto:TIEMPO:segundos
             String[] partes = update.split(":");
-            if (partes.length >= 5) {
-                String ipLider = partes[1];
-                double montoLider = Double.parseDouble(partes[2]);
-                long tiempoRestante = Long.parseLong(partes[4]);
+            if (partes.length >= 6) {
+                String clienteId = partes[1] + ":" + partes[2];
+                double montoLider = Double.parseDouble(partes[3]);
+                long tiempoRestante = Long.parseLong(partes[5]);
 
                 System.out.println("\n[ACTUALIZACION DEL SERVIDOR]");
-                System.out.println("  Oferta ganadora: $" + montoLider + " (IP: " + ipLider + ")");
+                System.out.println("  Oferta ganadora: $" + montoLider + " (Cliente: " + clienteId + ")");
                 System.out.println("  Tiempo restante: " + tiempoRestante + " segundos");
                 System.out.println("-------------------------------------------");
             }

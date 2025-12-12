@@ -533,22 +533,41 @@ public class ServidorSubastaBully {
 
     public boolean actualizarPropuestaMasAlta(double nuevaPropuesta, String ip) {
         synchronized(lockSubasta) {
+            // Obtener ganador ANTES de agregar la nueva oferta
+            EstadoSubastaReplicado estado = gestorEleccion.getEstadoSubasta();
+            Map.Entry<String, Double> ganadorAnterior = estado.getOfertaGanadora();
+            double montoAnterior = (ganadorAnterior != null) ? ganadorAnterior.getValue() : 0.0;
+
+            System.out.println("[VERIFICACION] Oferta nueva: $" + nuevaPropuesta + " de " + ip);
+            System.out.println("[VERIFICACION] Ganador anterior: " +
+                             (ganadorAnterior != null ? ganadorAnterior.getKey() + " -> $" + ganadorAnterior.getValue() : "ninguno"));
+
             // Registrar oferta en el estado replicado
             // El gestor de elección se encargará de replicar a todos los nodos
             if (gestorEleccion.esCoordinador()) {
                 gestorEleccion.registrarOferta(ip, nuevaPropuesta);
             }
 
-            // Obtener la oferta ganadora actual del estado replicado
-            EstadoSubastaReplicado estado = gestorEleccion.getEstadoSubasta();
+            // Obtener la oferta ganadora DESPUES de agregar
             Map.Entry<String, Double> ganadorActual = estado.getOfertaGanadora();
+            System.out.println("[VERIFICACION] Ganador actual: " +
+                             (ganadorActual != null ? ganadorActual.getKey() + " -> $" + ganadorActual.getValue() : "ninguno"));
 
             // Verificar si la nueva propuesta es la más alta
             if (ganadorActual != null && ganadorActual.getKey().equals(ip)) {
-                System.out.println("[NUEVA ALTA] $" + nuevaPropuesta + " de " + ip);
-                return true;
+                // Solo es "nueva alta" si el monto es mayor que el anterior
+                if (nuevaPropuesta > montoAnterior) {
+                    System.out.println("[NUEVA ALTA] $" + nuevaPropuesta + " de " + ip);
+                    return true;
+                } else {
+                    System.out.println("[MISMA ALTA] $" + nuevaPropuesta + " de " + ip + " (ya era el ganador)");
+                    return true; // Sigue siendo el ganador
+                }
+            } else {
+                System.out.println("[NO ES ALTA] $" + nuevaPropuesta + " de " + ip + " (perdiendo contra $" +
+                                 (ganadorActual != null ? ganadorActual.getValue() : 0) + ")");
+                return false;
             }
-            return false;
         }
     }
 

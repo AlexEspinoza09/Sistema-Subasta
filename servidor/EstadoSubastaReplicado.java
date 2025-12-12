@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public class EstadoSubastaReplicado implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    // Mapa thread-safe de ofertas: IP del cliente -> monto ofertado
+    // Mapa thread-safe de ofertas: ID del cliente (IP:Puerto) -> monto ofertado
     private ConcurrentHashMap<String, Double> ofertas;
 
     // Timestamp de última actualización (para sincronización)
@@ -28,20 +28,38 @@ public class EstadoSubastaReplicado implements Serializable {
 
     /**
      * Agrega o actualiza una oferta
+     * @param clienteId ID único del cliente (IP:Puerto)
+     * @param monto Monto de la oferta
      */
-    public synchronized void agregarOferta(String ip, double monto) {
-        ofertas.put(ip, monto);
+    public synchronized void agregarOferta(String clienteId, double monto) {
+        // Log estado antes de agregar
+        System.out.println("[ESTADO] ANTES de agregar - Total ofertas: " + ofertas.size());
+        if (!ofertas.isEmpty()) {
+            System.out.println("[ESTADO] Ofertas existentes:");
+            for (Map.Entry<String, Double> entry : ofertas.entrySet()) {
+                System.out.println("[ESTADO]   - " + entry.getKey() + " -> $" + entry.getValue());
+            }
+        }
+
+        ofertas.put(clienteId, monto);
         timestampUltimaActualizacion = System.currentTimeMillis();
 
-        System.out.println("[ESTADO] Oferta registrada: " + ip + " -> $" + monto);
-        System.out.println("[ESTADO] Total de ofertas: " + ofertas.size());
+        System.out.println("[ESTADO] Oferta registrada: " + clienteId + " -> $" + monto);
+        System.out.println("[ESTADO] DESPUÉS de agregar - Total de ofertas: " + ofertas.size());
+
+        // Mostrar ganador actual
+        Map.Entry<String, Double> ganador = getOfertaGanadora();
+        if (ganador != null) {
+            System.out.println("[ESTADO] Ganador actual: " + ganador.getKey() + " -> $" + ganador.getValue());
+        }
     }
 
     /**
      * Obtiene la oferta de un cliente específico
+     * @param clienteId ID único del cliente (IP:Puerto)
      */
-    public Double getOferta(String ip) {
-        return ofertas.get(ip);
+    public Double getOferta(String clienteId) {
+        return ofertas.get(clienteId);
     }
 
     /**
@@ -99,16 +117,29 @@ public class EstadoSubastaReplicado implements Serializable {
 
     /**
      * Sincroniza este estado con otro estado recibido
-     * Solo actualiza si el estado recibido es más reciente
+     * Solo actualiza si el estado recibido es más reciente O si el estado local está vacío
      */
     public synchronized void sincronizarCon(EstadoSubastaReplicado otroEstado) {
         if (otroEstado == null) return;
 
-        // Solo sincronizar si el otro estado es más reciente
-        if (otroEstado.timestampUltimaActualizacion > this.timestampUltimaActualizacion) {
+        System.out.println("[ESTADO] Intentando sincronizar:");
+        System.out.println("[ESTADO]   - Estado local: " + ofertas.size() + " ofertas, timestamp: " + this.timestampUltimaActualizacion);
+        System.out.println("[ESTADO]   - Estado remoto: " + otroEstado.ofertas.size() + " ofertas, timestamp: " + otroEstado.timestampUltimaActualizacion);
+
+        // Si mi estado está vacío, tomar el estado del otro nodo sin importar timestamp
+        // Si mi estado tiene ofertas, solo sincronizar si el otro es más reciente
+        if (this.ofertas.isEmpty() && !otroEstado.ofertas.isEmpty()) {
+            System.out.println("[ESTADO] Estado local vacío - aceptando estado remoto");
             this.ofertas = new ConcurrentHashMap<>(otroEstado.ofertas);
             this.timestampUltimaActualizacion = otroEstado.timestampUltimaActualizacion;
-            System.out.println("[ESTADO] Sincronizado con estado más reciente. Ofertas: " + ofertas.size());
+            System.out.println("[ESTADO] ✓ Sincronizado. Ofertas: " + ofertas.size());
+        } else if (otroEstado.timestampUltimaActualizacion > this.timestampUltimaActualizacion) {
+            System.out.println("[ESTADO] Estado remoto más reciente - sincronizando");
+            this.ofertas = new ConcurrentHashMap<>(otroEstado.ofertas);
+            this.timestampUltimaActualizacion = otroEstado.timestampUltimaActualizacion;
+            System.out.println("[ESTADO] ✓ Sincronizado. Ofertas: " + ofertas.size());
+        } else {
+            System.out.println("[ESTADO] Estado local es más reciente o igual - no se sincroniza");
         }
     }
 
